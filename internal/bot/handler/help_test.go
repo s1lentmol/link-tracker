@@ -8,6 +8,7 @@ import (
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot/handler"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure/memory"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/usecase"
 )
 
 func TestHelpCommand(t *testing.T) {
@@ -45,7 +46,8 @@ func TestHelpCommand(t *testing.T) {
 
 			mock := &mockBotClient{}
 			repo := memory.NewUserRepository()
-			h := handler.New(mock, repo, newTestLogger())
+			uc := usecase.NewUserUseCase(repo)
+			h := handler.New(mock, uc, newTestLogger())
 
 			update := makeCommandUpdate(tt.chatID, tt.username, "help")
 			h.HandleUpdate(update)

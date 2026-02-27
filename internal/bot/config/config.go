@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -24,6 +25,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	cfg.AppTelegramToken = strings.TrimSpace(cfg.AppTelegramToken)
 	if cfg.AppTelegramToken == "" {
 		return nil, fmt.Errorf("APP_TELEGRAM_TOKEN is required")
 	}

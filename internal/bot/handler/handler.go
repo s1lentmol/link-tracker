@@ -4,68 +4,65 @@ import (
 	"log/slog"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain/repository"
 )
 
-type BotClient interface {
-	Send(c tgbotapi.Chattable) (tgbotapi.Message, error)
-	Request(c tgbotapi.Chattable) (*tgbotapi.APIResponse, error)
+type Bot interface {
+	SendMessage(chatID int64, text string) error
+	SetCommands(commands map[string]string) error
 }
 
-type Command struct {
-	Name        string
-	Description string
-	Handle      func(update tgbotapi.Update)
+type UserService interface {
+	RegisterUser(chatID int64, username string) (bool, error)
+}
+
+type command struct {
+	name        string
+	description string
+	handle      func(update tgbotapi.Update)
 }
 
 type Handler struct {
-	bot      BotClient
-	logger   *slog.Logger
-	commands map[string]Command
-	userRepo repository.UserRepository
+	bot         Bot
+	logger      *slog.Logger
+	commands    map[string]command
+	userService UserService
 }
 
-func New(bot BotClient, userRepo repository.UserRepository, logger *slog.Logger) *Handler {
+func New(bot Bot, userService UserService, logger *slog.Logger) *Handler {
 	h := &Handler{
-		bot:      bot,
-		logger:   logger,
-		commands: make(map[string]Command),
-		userRepo: userRepo,
+		bot:         bot,
+		logger:      logger,
+		commands:    make(map[string]command),
+		userService: userService,
 	}
 
 	h.registerCommands()
+	h.setMyCommands()
 
 	return h
 }
 
 func (h *Handler) registerCommands() {
-	cmds := []Command{
+	cmds := []command{
 		newStartCommand(h),
 		newHelpCommand(h),
 	}
 
 	for _, cmd := range cmds {
-		h.commands[cmd.Name] = cmd
+		h.commands[cmd.name] = cmd
 	}
 }
 
-func (h *Handler) SetMyCommands() {
-	var botCommands []tgbotapi.BotCommand
-
-	for _, cmd := range h.commands {
-		botCommands = append(botCommands, tgbotapi.BotCommand{
-			Command:     cmd.Name,
-			Description: cmd.Description,
-		})
+func (h *Handler) setMyCommands() {
+	cmds := make(map[string]string)
+	for name, cmd := range h.commands {
+		cmds[name] = cmd.description
 	}
 
-	cfg := tgbotapi.NewSetMyCommands(botCommands...)
-
-	if _, err := h.bot.Request(cfg); err != nil {
+	if err := h.bot.SetCommands(cmds); err != nil {
 		h.logger.Error("failed to set bot commands", slog.String("error", err.Error()))
 	} else {
-		h.logger.Info("bot commands registered", slog.Int("count", len(botCommands)))
+		h.logger.Info("bot commands registered", slog.Int("count", len(cmds)))
 	}
 }
 
@@ -93,22 +90,11 @@ func (h *Handler) HandleUpdate(update tgbotapi.Update) {
 		slog.String("username", update.Message.From.UserName),
 	)
 
-	cmd.Handle(update)
-}
-
-func (h *Handler) AllCommands() []Command {
-	cmds := make([]Command, 0, len(h.commands))
-	for _, cmd := range h.commands {
-		cmds = append(cmds, cmd)
-	}
-
-	return cmds
+	cmd.handle(update)
 }
 
 func (h *Handler) sendMessage(chatID int64, text string) {
-	msg := tgbotapi.NewMessage(chatID, text)
-
-	if _, err := h.bot.Send(msg); err != nil {
+	if err := h.bot.SendMessage(chatID, text); err != nil {
 		h.logger.Error("failed to send message",
 			slog.Int64("chat_id", chatID),
 			slog.String("error", err.Error()),

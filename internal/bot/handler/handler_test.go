@@ -11,6 +11,7 @@ import (
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot/handler"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure/memory"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/usecase"
 )
 
 type sentMessage struct {
@@ -19,25 +20,21 @@ type sentMessage struct {
 }
 
 type mockBotClient struct {
-	messages     []sentMessage
-	requestCalls int
+	messages []sentMessage
+	setCmds  bool
 }
 
-func (m *mockBotClient) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
-	if msg, ok := c.(tgbotapi.MessageConfig); ok {
-		m.messages = append(m.messages, sentMessage{
-			ChatID: msg.ChatID,
-			Text:   msg.Text,
-		})
-	}
-
-	return tgbotapi.Message{}, nil
+func (m *mockBotClient) SendMessage(chatID int64, text string) error {
+	m.messages = append(m.messages, sentMessage{
+		ChatID: chatID,
+		Text:   text,
+	})
+	return nil
 }
 
-func (m *mockBotClient) Request(c tgbotapi.Chattable) (*tgbotapi.APIResponse, error) {
-	m.requestCalls++
-
-	return &tgbotapi.APIResponse{Ok: true}, nil
+func (m *mockBotClient) SetCommands(commands map[string]string) error {
+	m.setCmds = true
+	return nil
 }
 
 func newTestLogger() *slog.Logger {
@@ -118,7 +115,8 @@ func TestHandleUpdate(t *testing.T) {
 
 			mock := &mockBotClient{}
 			repo := memory.NewUserRepository()
-			h := handler.New(mock, repo, newTestLogger())
+			uc := usecase.NewUserUseCase(repo)
+			h := handler.New(mock, uc, newTestLogger())
 
 			h.HandleUpdate(tt.update)
 
@@ -134,34 +132,13 @@ func TestHandleUpdate(t *testing.T) {
 	}
 }
 
-func TestSetMyCommands(t *testing.T) {
+func TestNew_RegistersCommands(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockBotClient{}
 	repo := memory.NewUserRepository()
-	h := handler.New(mock, repo, newTestLogger())
+	uc := usecase.NewUserUseCase(repo)
+	_ = handler.New(mock, uc, newTestLogger())
 
-	h.SetMyCommands()
-
-	assert.Equal(t, 1, mock.requestCalls, "SetMyCommands должен вызвать Request один раз")
-}
-
-func TestAllCommands(t *testing.T) {
-	t.Parallel()
-
-	mock := &mockBotClient{}
-	repo := memory.NewUserRepository()
-	h := handler.New(mock, repo, newTestLogger())
-
-	cmds := h.AllCommands()
-
-	assert.Len(t, cmds, 2, "должно быть 2 зарегистрированные команды")
-
-	names := make(map[string]bool)
-	for _, cmd := range cmds {
-		names[cmd.Name] = true
-	}
-
-	assert.True(t, names["start"], "должна быть команда start")
-	assert.True(t, names["help"], "должна быть команда help")
+	assert.True(t, mock.setCmds, "New должен вызвать SetCommands для установки команд")
 }

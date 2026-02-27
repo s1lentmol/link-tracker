@@ -7,10 +7,11 @@ import (
 	"syscall"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot/config"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot/handler"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure/memory"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/infrastructure/telegram"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/usecase"
 )
 
 func main() {
@@ -22,18 +23,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	bot, err := tgbotapi.NewBotAPI(cfg.AppTelegramToken)
+	bot, err := telegram.New(cfg.AppTelegramToken)
 	if err != nil {
 		logger.Error("failed to create bot", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 
-	logger.Info("bot authorized", slog.String("username", bot.Self.UserName))
+	logger.Info("bot authorized", slog.String("username", bot.GetUserName()))
 
 	userRepo := memory.NewUserRepository()
-	h := handler.New(bot, userRepo, logger)
-
-	h.SetMyCommands()
+	userUseCase := usecase.NewUserUseCase(userRepo)
+	h := handler.New(bot, userUseCase, logger)
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60

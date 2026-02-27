@@ -5,39 +5,25 @@ import (
 	"log/slog"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/domain/model"
 )
 
-func newStartCommand(h *Handler) Command {
-	return Command{
-		Name:        "start",
-		Description: "Начало работы с ботом",
-		Handle: func(update tgbotapi.Update) {
+func newStartCommand(h *Handler) command {
+	return command{
+		name:        "start",
+		description: "Начало работы с ботом",
+		handle: func(update tgbotapi.Update) {
 			chatID := update.Message.Chat.ID
 			username := update.Message.From.UserName
 
-			exists, err := h.userRepo.Exists(chatID)
+			isNew, err := h.userService.RegisterUser(chatID, username)
 			if err != nil {
-				h.logger.Error("failed to check user existence",
+				h.logger.Error("failed to register user",
 					slog.Int64("chat_id", chatID),
 					slog.String("error", err.Error()),
 				)
 			}
 
-			if !exists {
-				user := model.User{
-					ChatID:   chatID,
-					Username: username,
-				}
-
-				if err := h.userRepo.Save(user); err != nil {
-					h.logger.Error("failed to save user",
-						slog.Int64("chat_id", chatID),
-						slog.String("error", err.Error()),
-					)
-				}
-
+			if isNew {
 				h.logger.Info("new user registered",
 					slog.Int64("chat_id", chatID),
 					slog.String("username", username),

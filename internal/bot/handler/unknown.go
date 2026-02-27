@@ -7,12 +7,11 @@ import (
 )
 
 func (h *Handler) handleUnknown(update tgbotapi.Update) {
-	chatID := update.Message.Chat.ID
-
 	h.logger.Warn("unknown command received",
-		slog.Int64("chat_id", chatID),
+		slog.Int64("chat_id", update.Message.Chat.ID),
+		slog.String("username", update.Message.From.UserName),
 		slog.String("text", update.Message.Text),
 	)
 
-	h.sendMessage(chatID, "Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд.")
+	h.sendMessage(update.Message.Chat.ID, "Неизвестная команда. Воспользуйтесь /help, чтобы посмотреть список доступных команд.")
 }
