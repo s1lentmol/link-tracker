@@ -11,5 +11,5 @@
 
 2. Запустите бота командой:
    ```bash
-   go run cmd/bot/main.go
+   go run services/bot/cmd/bot/main.go
    ```
