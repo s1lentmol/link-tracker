@@ -1,0 +1,62 @@
+package handler_test
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	memory "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/adapter/storage"
+	handler "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/controller/telegram"
+	usecase "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/usecase/user"
+)
+
+func TestHelpCommand(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		chatID       int64
+		username     string
+		wantContains []string
+	}{
+		{
+			name:     "ответ содержит заголовок и команды в формате /name — description",
+			chatID:   100,
+			username: "alice",
+			wantContains: []string{
+				"Доступные команды",
+				"/start — Начало работы с ботом",
+				"/help — Список доступных команд",
+			},
+		},
+		{
+			name:     "ответ отправляется в правильный чат",
+			chatID:   999,
+			username: "bob",
+			wantContains: []string{
+				"Доступные команды",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mock := &mockBotClient{}
+			repo := memory.NewUserRepository()
+			uc := usecase.NewUserUseCase(repo)
+			h := handler.New(mock, uc, newTestLogger())
+
+			update := makeCommandUpdate(tt.chatID, tt.username, "help")
+			h.HandleUpdate(update)
+
+			require.Len(t, mock.messages, 1)
+			assert.Equal(t, tt.chatID, mock.messages[0].ChatID)
+
+			for _, s := range tt.wantContains {
+				assert.Contains(t, mock.messages[0].Text, s)
+			}
+		})
+	}
+}
