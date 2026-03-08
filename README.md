@@ -68,10 +68,3 @@ go run ./services/bot/cmd/bot
 go build ./...
 go test ./...
 ```
-
-## Быстрая ручная проверка
-
-1. В Telegram отправьте `/start`.
-2. Выполните `/track` и добавьте ссылку GitHub или StackOverflow.
-3. Проверьте `/list`.
-4. Для проверки уведомлений обновите отслеживаемый ресурс и дождитесь следующего тика `SCHEDULER_INTERVAL`.
