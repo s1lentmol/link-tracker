@@ -1,7 +1,7 @@
 COVERAGE_FILE ?= coverage.out
 
-# Get all directories in cmd/ as available modules
-MODULES := $(notdir $(wildcard cmd/*))
+# Get all directories in cmd/ as available modules and add moved services
+MODULES := $(sort $(notdir $(wildcard cmd/*)) bot)
 
 # Help target - display usage information
 .PHONY: help
@@ -15,7 +15,7 @@ help:
 build:
 	@echo "Building all modules: $(MODULES)"
 	@mkdir -p bin
-	@$(foreach mod,$(MODULES),echo "Building module: $(mod)"; go build -o ./bin/$(mod) ./cmd/$(mod);)
+	@$(foreach mod,$(MODULES),echo "Building module: $(mod)"; if [ "$(mod)" = "bot" ]; then go build -o ./bin/$(mod) ./services/bot/cmd/$(mod); else go build -o ./bin/$(mod) ./cmd/$(mod); fi;)
 
 # Convenience targets for building individual modules
 .PHONY: $(addprefix build_,$(MODULES))
@@ -23,10 +23,14 @@ $(addprefix build_,$(MODULES)):
 	@modulename=$(subst build_,,$@); \
 	echo "Building module: $$modulename"; \
 	mkdir -p bin; \
-	go build -o ./bin/$$modulename ./cmd/$$modulename
+	if [ "$$modulename" = "bot" ]; then \
+		go build -o ./bin/$$modulename ./services/bot/cmd/$$modulename; \
+	else \
+		go build -o ./bin/$$modulename ./cmd/$$modulename; \
+	fi
 
 ## test: run all tests
 .PHONY: test
 test:
-	@go test -coverpkg='github.com/es-debug/backend-academy-2024-go-template/...' --race -count=1 -coverprofile='$(COVERAGE_FILE)' ./...
+	@go test --race -count=1 -coverprofile='$(COVERAGE_FILE)' ./...
 	@go tool cover -func='$(COVERAGE_FILE)' | grep ^total | tr -s '\t'
