@@ -7,9 +7,14 @@ import (
 )
 
 func (h *Handler) handleUnknown(update tgbotapi.Update) {
+	username := ""
+	if update.Message != nil && update.Message.From != nil {
+		username = update.Message.From.UserName
+	}
+
 	h.logger.Warn("unknown command received",
 		slog.Int64("chat_id", update.Message.Chat.ID),
-		slog.String("username", update.Message.From.UserName),
+		slog.String("username", username),
 		slog.String("text", update.Message.Text),
 	)
 
