@@ -6,7 +6,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	memory "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/adapter/storage"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/adapter/storage"
 	handler "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/controller/telegram"
 	usecase "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/usecase/user"
 )
@@ -62,8 +62,8 @@ func TestUnknownCommand(t *testing.T) {
 			t.Parallel()
 
 			mock := &mockBotClient{}
-			repo := memory.NewUserRepository()
-			uc := usecase.NewUserUseCase(repo)
+			repo := storage.NewUserRepository()
+			uc := usecase.New(repo)
 			h := handler.New(mock, uc, newTestLogger())
 
 			h.HandleUpdate(tt.update)

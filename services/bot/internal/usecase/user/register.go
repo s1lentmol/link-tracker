@@ -12,7 +12,7 @@ type UserUseCase struct {
 	repo UserRepo
 }
 
-func NewUserUseCase(repo UserRepo) *UserUseCase {
+func New(repo UserRepo) *UserUseCase {
 	return &UserUseCase{repo: repo}
 }
 

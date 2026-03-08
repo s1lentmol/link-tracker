@@ -8,7 +8,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	memory "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/adapter/storage"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/adapter/storage"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/adapter/telegram"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/config"
 	handler "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/controller/telegram"
@@ -32,8 +32,8 @@ func main() {
 
 	logger.Info("bot authorized", slog.String("username", bot.GetUserName()))
 
-	userRepo := memory.NewUserRepository()
-	userUseCase := usecase.NewUserUseCase(userRepo)
+	userRepo := storage.NewUserRepository()
+	userUseCase := usecase.New(userRepo)
 	h := handler.New(bot, userUseCase, logger)
 
 	u := tgbotapi.NewUpdate(0)
