@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/adapter/storage"
 	handler "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/controller/telegram"
-	usecase "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/usecase/user"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/usecase/user"
 )
 
 func TestUnknownCommand(t *testing.T) {
@@ -63,7 +63,7 @@ func TestUnknownCommand(t *testing.T) {
 
 			mock := &mockBotClient{}
 			repo := storage.NewUserRepository()
-			uc := usecase.New(repo)
+			uc := user.NewUseCase(repo)
 			h := handler.New(mock, uc, newTestLogger())
 
 			h.HandleUpdate(tt.update)

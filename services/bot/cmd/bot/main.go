@@ -12,7 +12,7 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/adapter/telegram"
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/config"
 	handler "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/controller/telegram"
-	usecase "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/usecase/user"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/usecase/user"
 )
 
 func main() {
@@ -33,7 +33,7 @@ func main() {
 	logger.Info("bot authorized", slog.String("username", bot.GetUserName()))
 
 	userRepo := storage.NewUserRepository()
-	userUseCase := usecase.New(userRepo)
+	userUseCase := user.NewUseCase(userRepo)
 	h := handler.New(bot, userUseCase, logger)
 
 	u := tgbotapi.NewUpdate(0)

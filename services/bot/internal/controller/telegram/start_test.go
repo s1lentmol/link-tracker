@@ -8,7 +8,7 @@ import (
 
 	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/adapter/storage"
 	handler "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/controller/telegram"
-	usecase "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/usecase/user"
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/usecase/user"
 )
 
 func TestStartCommand(t *testing.T) {
@@ -76,7 +76,7 @@ func TestStartCommand(t *testing.T) {
 
 			mock := &mockBotClient{}
 			repo := storage.NewUserRepository()
-			uc := usecase.New(repo)
+			uc := user.NewUseCase(repo)
 			h := handler.New(mock, uc, newTestLogger())
 
 			update := makeCommandUpdate(tt.chatID, tt.username, "start")

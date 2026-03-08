@@ -1,6 +1,10 @@
 package user
 
-import "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/domain"
+import (
+	"fmt"
+
+	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/services/bot/internal/domain"
+)
 
 type UserRepo interface {
 	Save(user domain.User) error
@@ -8,18 +12,18 @@ type UserRepo interface {
 	Exists(chatID int64) (bool, error)
 }
 
-type UserUseCase struct {
+type UseCase struct {
 	repo UserRepo
 }
 
-func New(repo UserRepo) *UserUseCase {
-	return &UserUseCase{repo: repo}
+func NewUseCase(repo UserRepo) *UseCase {
+	return &UseCase{repo: repo}
 }
 
-func (u *UserUseCase) RegisterUser(chatID int64, username string) (bool, error) {
+func (u *UseCase) RegisterUser(chatID int64, username string) (bool, error) {
 	exists, err := u.repo.Exists(chatID)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("save user: %w", err)
 	}
 
 	if exists {
@@ -32,7 +36,7 @@ func (u *UserUseCase) RegisterUser(chatID int64, username string) (bool, error) 
 	}
 
 	if err := u.repo.Save(user); err != nil {
-		return false, err
+		return false, fmt.Errorf("check user exists: %w", err)
 	}
 
 	return true, nil
