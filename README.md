@@ -53,13 +53,13 @@ STACK_BASE_URL=https://api.stackexchange.com/2.3
 1. Запустите scrapper:
 
 ```bash
-go run ./services/scrapper/cmd/scrapper
+go run ./cmd/scrapper
 ```
 
 2. В отдельном терминале запустите bot:
 
 ```bash
-go run ./services/bot/cmd/bot
+go run ./cmd/bot
 ```
 
 ## Сборка и тесты

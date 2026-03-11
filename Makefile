@@ -13,18 +13,18 @@ help:
 build:
 	@echo "Building all modules: $(MODULES)"
 	@mkdir -p bin
-	@go build -o ./bin/bot ./services/bot/cmd/bot
-	@go build -o ./bin/scrapper ./services/scrapper/cmd/scrapper
+	@go build -o ./bin/bot ./cmd/bot
+	@go build -o ./bin/scrapper ./cmd/scrapper
 
 .PHONY: build_bot
 build_bot:
 	@mkdir -p bin
-	@go build -o ./bin/bot ./services/bot/cmd/bot
+	@go build -o ./bin/bot ./cmd/bot
 
 .PHONY: build_scrapper
 build_scrapper:
 	@mkdir -p bin
-	@go build -o ./bin/scrapper ./services/scrapper/cmd/scrapper
+	@go build -o ./bin/scrapper ./cmd/scrapper
 
 .PHONY: test
 test:
