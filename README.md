@@ -62,6 +62,20 @@ go run ./cmd/scrapper
 go run ./cmd/bot
 ```
 
+## Запуск через Docker Compose
+
+1. Создайте `.env`:
+
+```bash
+cp .env.example .env
+```
+
+2. Поднимите оба сервиса:
+
+```bash
+docker compose up --build
+```
+
 ## Сборка и тесты
 
 ```bash
