@@ -9,8 +9,8 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	grpcadapter "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot/infrastructure/grpc"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/shared/pb"
+	grpcadapter "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/infrastructure/grpc"
+	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/shared/pb"
 )
 
 func newListCommand(h *Handler) command {
@@ -44,19 +44,7 @@ func newListCommand(h *Handler) command {
 			}
 
 			var sb strings.Builder
-			sb.WriteString("Отслеживаемые ссылки:\n")
-			for _, link := range links {
-				sb.WriteString("\n- ")
-				sb.WriteString(link.GetUrl())
-				if len(link.GetTags()) > 0 {
-					sb.WriteString("\n  теги: ")
-					sb.WriteString(strings.Join(link.GetTags(), ", "))
-				}
-				if len(link.GetFilters()) > 0 {
-					sb.WriteString("\n  фильтры: ")
-					sb.WriteString(strings.Join(link.GetFilters(), ", "))
-				}
-			}
+			sb.WriteString(formatTrackedLinks(links))
 			if tag != "" {
 				sb.WriteString(fmt.Sprintf("\n\nФильтр по тегу: %s", tag))
 			}
@@ -82,4 +70,22 @@ func filterLinksByTag(links []*pb.LinkResponse, tag string) []*pb.LinkResponse {
 		}
 	}
 	return filtered
+}
+
+func formatTrackedLinks(links []*pb.LinkResponse) string {
+	var sb strings.Builder
+	sb.WriteString("Отслеживаемые ссылки:\n")
+	for _, link := range links {
+		sb.WriteString("\n- ")
+		sb.WriteString(link.GetUrl())
+		if len(link.GetTags()) > 0 {
+			sb.WriteString("\n  теги: ")
+			sb.WriteString(strings.Join(link.GetTags(), ", "))
+		}
+		if len(link.GetFilters()) > 0 {
+			sb.WriteString("\n  фильтры: ")
+			sb.WriteString(strings.Join(link.GetFilters(), ", "))
+		}
+	}
+	return sb.String()
 }

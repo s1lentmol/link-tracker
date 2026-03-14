@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"os"
 
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot/app"
-	loggerpkg "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/logger"
+	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/app"
+	loggerpkg "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/pkg/logger"
 )
 
 func main() {

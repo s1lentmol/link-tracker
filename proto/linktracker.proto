@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package linktracker.v1;
 
-option go_package = "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/shared/pb;pb";
+option go_package = "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/shared/pb;pb";
 
 service ScrapperService {
   rpc RegisterChat(RegisterChatRequest) returns (RegisterChatResponse);

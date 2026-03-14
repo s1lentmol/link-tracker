@@ -11,10 +11,15 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 
-	grpcadapter "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/bot/infrastructure/grpc"
+	grpcadapter "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/infrastructure/grpc"
 )
 
 var stackOverflowQuestionPath = regexp.MustCompile(`^/questions/(\d+)(/.*)?$`)
+
+const (
+	githubHost        = "github.com"
+	stackOverflowHost = "stackoverflow.com"
+)
 
 func (h *Handler) handleDialogInput(update tgbotapi.Update, state DialogState) {
 	chatID := update.Message.Chat.ID
@@ -23,6 +28,11 @@ func (h *Handler) handleDialogInput(update tgbotapi.Update, state DialogState) {
 	switch state.Step {
 	case StepAwaitURL:
 		if _, err := validateSupportedURL(text); err != nil {
+			h.logger.Warn("invalid track url input",
+				slog.Int64("chat_id", chatID),
+				slog.String("input", text),
+				slog.String("error", err.Error()),
+			)
 			h.sendMessage(chatID, "Некорректная ссылка. Поддерживаются GitHub репозитории и вопросы StackOverflow.")
 			return
 		}
@@ -30,15 +40,20 @@ func (h *Handler) handleDialogInput(update tgbotapi.Update, state DialogState) {
 		h.stateStore.Set(chatID, DialogState{Step: StepAwaitTags, Link: text})
 		h.sendMessage(chatID, "Введите теги через запятую (или отправьте '-' для пропуска).")
 	case StepAwaitTags:
-		tags := parseCSV(text)
+		tags := parseListInput(text)
 		h.stateStore.Set(chatID, DialogState{Step: StepAwaitFilters, Link: state.Link, Tags: tags})
 		h.sendMessage(chatID, "Введите фильтры через запятую (или отправьте '-' для пропуска).")
 	case StepAwaitFilters:
-		filters := parseCSV(text)
+		filters := parseListInput(text)
 		h.finishTrack(chatID, state.Link, state.Tags, filters)
 		h.stateStore.Clear(chatID)
 	case StepAwaitUntrackURL:
 		if _, err := validateSupportedURL(text); err != nil {
+			h.logger.Warn("invalid untrack url input",
+				slog.Int64("chat_id", chatID),
+				slog.String("input", text),
+				slog.String("error", err.Error()),
+			)
 			h.sendMessage(chatID, "Некорректная ссылка. Поддерживаются GitHub репозитории и вопросы StackOverflow.")
 			return
 		}
@@ -86,12 +101,12 @@ func validateSupportedURL(raw string) (*url.URL, error) {
 	}
 
 	switch strings.ToLower(u.Host) {
-	case "github.com":
+	case githubHost:
 		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 		if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
 			return nil, fmt.Errorf("invalid github link")
 		}
-	case "stackoverflow.com":
+	case stackOverflowHost:
 		if !stackOverflowQuestionPath.MatchString(u.Path) {
 			return nil, fmt.Errorf("invalid stackoverflow link")
 		}
@@ -102,7 +117,7 @@ func validateSupportedURL(raw string) (*url.URL, error) {
 	return u, nil
 }
 
-func parseCSV(raw string) []string {
+func parseListInput(raw string) []string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || raw == "-" {
 		return []string{}

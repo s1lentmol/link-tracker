@@ -700,7 +700,7 @@ const file_proto_linktracker_proto_rawDesc = "" +
 	"\n" +
 	"BotService\x12L\n" +
 	"\n" +
-	"SendUpdate\x12\x1a.linktracker.v1.LinkUpdate\x1a\".linktracker.v1.SendUpdateResponseBWZUgitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/shared/pb;pbb\x06proto3"
+	"SendUpdate\x12\x1a.linktracker.v1.LinkUpdate\x1a\".linktracker.v1.SendUpdateResponseBWZUgitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/shared/pb;pbb\x06proto3"
 
 var (
 	file_proto_linktracker_proto_rawDescOnce sync.Once

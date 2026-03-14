@@ -18,7 +18,7 @@ func New(baseURL string, httpClient *http.Client) *Client {
 	return &Client{baseURL: strings.TrimRight(baseURL, "/"), http: httpClient}
 }
 
-func (c *Client) RepoUpdatedAt(ctx context.Context, owner string, repo string) (time.Time, error) {
+func (c *Client) GetRepoUpdatedAt(ctx context.Context, owner string, repo string) (time.Time, error) {
 	url := fmt.Sprintf("%s/repos/%s/%s", c.baseURL, owner, repo)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {

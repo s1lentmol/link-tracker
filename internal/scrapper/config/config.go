@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	configpkg "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/pkg/config"
+	configpkg "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/pkg/config"
 )
 
 type Config struct {

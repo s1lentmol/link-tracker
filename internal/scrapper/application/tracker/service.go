@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/scrapper/apperr"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/scrapper/infrastructure/http/github"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/scrapper/infrastructure/http/stackoverflow"
-	"gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/scrapper/infrastructure/storage"
+	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/apperr"
+	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/github"
+	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/stackoverflow"
+	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage"
 )
 
 var stackOverflowQuestionPath = regexp.MustCompile(`^/questions/(\d+)(/.*)?$`)
@@ -82,7 +82,7 @@ func (s *Service) resolveUpdatedAt(ctx context.Context, raw string) (time.Time, 
 
 	switch target.kind {
 	case "github":
-		return s.github.RepoUpdatedAt(ctx, target.owner, target.repo)
+		return s.github.GetRepoUpdatedAt(ctx, target.owner, target.repo)
 	case "stackoverflow":
 		return s.stack.QuestionUpdatedAt(ctx, target.questionID)
 	default:

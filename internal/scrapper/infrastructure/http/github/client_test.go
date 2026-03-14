@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	ghclient "gitlab.education.tbank.ru/backend-academy-go-2025/homeworks/link-tracker/internal/scrapper/infrastructure/http/github"
+	ghclient "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/github"
 )
 
-func TestClient_RepoUpdatedAt(t *testing.T) {
+func TestClient_GetRepoUpdatedAt(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -74,7 +74,7 @@ func TestClient_RepoUpdatedAt(t *testing.T) {
 			defer ts.Close()
 
 			client := ghclient.New(ts.URL, ts.Client())
-			got, err := client.RepoUpdatedAt(context.Background(), "owner", "repo")
+			got, err := client.GetRepoUpdatedAt(context.Background(), "owner", "repo")
 
 			if tt.wantErr {
 				require.Error(t, err)
