@@ -1,0 +1,28 @@
+services:
+  scrapper:
+    build:
+      context: .
+      dockerfile: cmd/scrapper/Dockerfile
+    env_file:
+      - .env
+    environment:
+      SCRAPPER_GRPC_ADDR: ":8081"
+      BOT_GRPC_ADDR: "bot:8082"
+    expose:
+      - "8081"
+    restart: unless-stopped
+
+  bot:
+    build:
+      context: .
+      dockerfile: cmd/bot/Dockerfile
+    env_file:
+      - .env
+    environment:
+      BOT_GRPC_ADDR: ":8082"
+      SCRAPPER_GRPC_ADDR: "scrapper:8081"
+    depends_on:
+      - scrapper
+    expose:
+      - "8082"
+    restart: unless-stopped
