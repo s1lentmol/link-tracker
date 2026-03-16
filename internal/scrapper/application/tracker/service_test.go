@@ -120,12 +120,10 @@ func TestService_CheckUpdates_GitHub(t *testing.T) {
 		newTestLogger(),
 	)
 
-	// Первый проход: инициализация lastUpdate + отправка уведомления.
+	// Первый проход: только инициализация lastUpdate, без уведомления.
 	svc.CheckUpdates(context.Background())
 	calls := notify.Calls()
-	require.Len(t, calls, 1)
-	assert.Equal(t, "https://github.com/owner/repo", calls[0].URL)
-	assert.Equal(t, []int64{1}, calls[0].ChatIDs)
+	require.Len(t, calls, 0)
 
 	updatedAtMu.Lock()
 	updatedAt = updatedAt.Add(5 * time.Minute)
@@ -134,11 +132,11 @@ func TestService_CheckUpdates_GitHub(t *testing.T) {
 	// Второй проход: timestamp изменился, должно уйти уведомление.
 	svc.CheckUpdates(context.Background())
 	calls = notify.Calls()
-	require.Len(t, calls, 2)
-	assert.Equal(t, "https://github.com/owner/repo", calls[1].URL)
-	assert.Equal(t, []int64{1}, calls[1].ChatIDs)
+	require.Len(t, calls, 1)
+	assert.Equal(t, "https://github.com/owner/repo", calls[0].URL)
+	assert.Equal(t, []int64{1}, calls[0].ChatIDs)
 
 	// Третий проход без изменений: новых уведомлений быть не должно.
 	svc.CheckUpdates(context.Background())
-	require.Len(t, notify.Calls(), 2)
+	require.Len(t, notify.Calls(), 1)
 }

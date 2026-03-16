@@ -49,6 +49,11 @@ func (s *Service) CheckUpdates(ctx context.Context) {
 			continue
 		}
 
+		if res.LastUpdate.IsZero() {
+			s.repo.SetLastUpdate(res.URL, updatedAt)
+			continue
+		}
+
 		s.repo.SetLastUpdate(res.URL, updatedAt)
 
 		err = s.notifier.SendUpdate(res.ID, res.URL, "В ресурсе появились изменения", res.ChatIDs)
