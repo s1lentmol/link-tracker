@@ -1,6 +1,8 @@
 FROM golang:1.25.2 AS builder
 
 WORKDIR /app
+ENV GOPROXY=direct
+ENV GOSUMDB=off
 
 COPY go.mod go.sum ./
 RUN go mod download
