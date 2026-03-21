@@ -30,6 +30,7 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/shared/pb"
 )
 
+//nolint:funlen // wiring/DI entrypoint intentionally composes many infra components.
 func Run(logger *slog.Logger) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -37,8 +38,8 @@ func Run(logger *slog.Logger) error {
 	}
 
 	if cfg.DBAutoMigrate {
-		if err := migrateinfra.Up(cfg.DBMigrationsPath, cfg.DBDsn); err != nil {
-			return fmt.Errorf("run migrations: %w", err)
+		if migrationErr := migrateinfra.Up(cfg.DBMigrationsPath, cfg.DBDsn); migrationErr != nil {
+			return fmt.Errorf("run migrations: %w", migrationErr)
 		}
 	}
 
@@ -55,8 +56,9 @@ func Run(logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(context.Background()); err != nil {
-		return fmt.Errorf("ping postgres: %w", err)
+	pingErr := pool.Ping(context.Background())
+	if pingErr != nil {
+		return fmt.Errorf("ping postgres: %w", pingErr)
 	}
 
 	repo, err := newRepository(cfg.DBAccessType, pool)
@@ -69,8 +71,8 @@ func Run(logger *slog.Logger) error {
 		return fmt.Errorf("create bot grpc client: %w", err)
 	}
 	defer func() {
-		if err := botClient.Close(); err != nil {
-			logger.Warn("failed to close bot grpc client", slog.String("error", err.Error()))
+		if closeErr := botClient.Close(); closeErr != nil {
+			logger.Warn("failed to close bot grpc client", slog.String("error", closeErr.Error()))
 		}
 	}()
 
@@ -81,7 +83,8 @@ func Run(logger *slog.Logger) error {
 	trackerService := tracker.New(repo, githubClient, stackOverflowClient, botClient, logger)
 	grpcSvc := grpccontroller.NewServer(repo, trackerService)
 
-	listener, err := net.Listen("tcp", cfg.ScrapperGRPCAddr)
+	var listenConfig net.ListenConfig
+	listener, err := listenConfig.Listen(context.Background(), "tcp", cfg.ScrapperGRPCAddr)
 	if err != nil {
 		return fmt.Errorf("listen scrapper grpc on %s: %w", cfg.ScrapperGRPCAddr, err)
 	}
@@ -92,9 +95,9 @@ func Run(logger *slog.Logger) error {
 	serveErr := make(chan error, 1)
 	go func() {
 		logger.Info("scrapper grpc server started", slog.String("addr", cfg.ScrapperGRPCAddr))
-		if err := grpcServer.Serve(listener); err != nil {
-			if !errors.Is(err, grpc.ErrServerStopped) {
-				serveErr <- err
+		if serveErrValue := grpcServer.Serve(listener); serveErrValue != nil {
+			if !errors.Is(serveErrValue, grpc.ErrServerStopped) {
+				serveErr <- serveErrValue
 			}
 		}
 	}()
@@ -118,10 +121,10 @@ func Run(logger *slog.Logger) error {
 		scheduler.Stop()
 		grpcServer.GracefulStop()
 		return nil
-	case err := <-serveErr:
+	case grpcServeErr := <-serveErr:
 		scheduler.Stop()
 		grpcServer.GracefulStop()
-		return fmt.Errorf("scrapper grpc server stopped unexpectedly: %w", err)
+		return fmt.Errorf("scrapper grpc server stopped unexpectedly: %w", grpcServeErr)
 	}
 }
 

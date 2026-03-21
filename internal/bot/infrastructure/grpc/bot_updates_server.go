@@ -2,7 +2,7 @@ package grpc
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 	"strings"
 
@@ -25,7 +25,7 @@ func NewBotUpdatesServer(sender MessageSender, logger *slog.Logger) *BotUpdatesS
 
 func (s *BotUpdatesServer) SendUpdate(_ context.Context, update *pb.LinkUpdate) (*pb.SendUpdateResponse, error) {
 	if update == nil {
-		return nil, fmt.Errorf("empty update")
+		return nil, errors.New("empty update")
 	}
 
 	for _, chatID := range update.GetTgChatIds() {

@@ -29,7 +29,7 @@ func (m *mockBotClient) SendMessage(chatID int64, text string) error {
 	return nil
 }
 
-func (m *mockBotClient) SetCommands(commands map[string]string) error {
+func (m *mockBotClient) SetCommands(_ map[string]string) error {
 	m.setCmds = true
 	return nil
 }

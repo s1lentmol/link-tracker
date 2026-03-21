@@ -17,6 +17,8 @@ import (
 
 var stackOverflowQuestionPath = regexp.MustCompile(`^/questions/(\d+)(/.*)?$`)
 
+const stackOverflowMinMatches = 2
+
 type BotNotifier interface {
 	SendUpdate(id int64, url string, description string, chatIDs []int64) error
 }
@@ -51,11 +53,11 @@ func (s *Service) CheckUpdates(ctx context.Context) {
 		}
 
 		for _, res := range resources {
-			updatedAt, err := s.resolveUpdatedAt(ctx, res.URL)
-			if err != nil {
+			updatedAt, resolveErr := s.resolveUpdatedAt(ctx, res.URL)
+			if resolveErr != nil {
 				s.logger.Warn("failed to fetch resource update timestamp",
 					slog.String("url", res.URL),
-					slog.String("error", err.Error()),
+					slog.String("error", resolveErr.Error()),
 				)
 				continue
 			}
@@ -65,21 +67,21 @@ func (s *Service) CheckUpdates(ctx context.Context) {
 			}
 
 			if res.LastUpdate.IsZero() {
-				if err := s.repo.SetLastUpdateByLinkID(ctx, res.ID, updatedAt); err != nil {
+				if setErr := s.repo.SetLastUpdateByLinkID(ctx, res.ID, updatedAt); setErr != nil {
 					s.logger.Error("failed to save initial last_update",
 						slog.Int64("link_id", res.ID),
 						slog.String("url", res.URL),
-						slog.String("error", err.Error()),
+						slog.String("error", setErr.Error()),
 					)
 				}
 				continue
 			}
 
-			if err := s.repo.SetLastUpdateByLinkID(ctx, res.ID, updatedAt); err != nil {
+			if setErr := s.repo.SetLastUpdateByLinkID(ctx, res.ID, updatedAt); setErr != nil {
 				s.logger.Error("failed to update last_update",
 					slog.Int64("link_id", res.ID),
 					slog.String("url", res.URL),
-					slog.String("error", err.Error()),
+					slog.String("error", setErr.Error()),
 				)
 				continue
 			}
@@ -116,9 +118,17 @@ func (s *Service) resolveUpdatedAt(ctx context.Context, raw string) (time.Time, 
 
 	switch target.kind {
 	case "github":
-		return s.github.GetRepoUpdatedAt(ctx, target.owner, target.repo)
+		updatedAt, repoErr := s.github.GetRepoUpdatedAt(ctx, target.owner, target.repo)
+		if repoErr != nil {
+			return time.Time{}, fmt.Errorf("github updated_at: %w", repoErr)
+		}
+		return updatedAt, nil
 	case "stackoverflow":
-		return s.stack.QuestionUpdatedAt(ctx, target.questionID)
+		updatedAt, questionErr := s.stack.QuestionUpdatedAt(ctx, target.questionID)
+		if questionErr != nil {
+			return time.Time{}, fmt.Errorf("stackoverflow updated_at: %w", questionErr)
+		}
+		return updatedAt, nil
 	default:
 		return time.Time{}, apperr.ErrUnsupportedLink
 	}
@@ -151,7 +161,7 @@ func parseTarget(raw string) (*target, error) {
 		return &target{kind: "github", owner: parts[0], repo: parts[1]}, nil
 	case "stackoverflow.com":
 		m := stackOverflowQuestionPath.FindStringSubmatch(u.Path)
-		if len(m) < 2 {
+		if len(m) < stackOverflowMinMatches {
 			return nil, fmt.Errorf("%w: invalid stackoverflow path", apperr.ErrInvalidLink)
 		}
 		return &target{kind: "stackoverflow", questionID: m[1]}, nil

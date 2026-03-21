@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -26,8 +27,10 @@ func (h *Handler) handleDialogInput(update tgbotapi.Update, state DialogState) {
 	text := strings.TrimSpace(update.Message.Text)
 
 	switch state.Step {
+	case StepIdle:
+		h.stateStore.Clear(chatID)
 	case StepAwaitURL:
-		if _, err := validateSupportedURL(text); err != nil {
+		if err := validateSupportedURL(text); err != nil {
 			h.logger.Warn("invalid track url input",
 				slog.Int64("chat_id", chatID),
 				slog.String("input", text),
@@ -48,7 +51,7 @@ func (h *Handler) handleDialogInput(update tgbotapi.Update, state DialogState) {
 		h.finishTrack(chatID, state.Link, state.Tags, filters)
 		h.stateStore.Clear(chatID)
 	case StepAwaitUntrackURL:
-		if _, err := validateSupportedURL(text); err != nil {
+		if err := validateSupportedURL(text); err != nil {
 			h.logger.Warn("invalid untrack url input",
 				slog.Int64("chat_id", chatID),
 				slog.String("input", text),
@@ -80,6 +83,22 @@ func (h *Handler) finishTrack(chatID int64, link string, tags []string, filters 
 			h.sendMessage(chatID, "Ссылка уже отслеживается")
 		case codes.NotFound:
 			h.sendMessage(chatID, "Сначала выполните /start, чтобы зарегистрировать чат.")
+		case codes.OK,
+			codes.Canceled,
+			codes.Unknown,
+			codes.InvalidArgument,
+			codes.DeadlineExceeded,
+			codes.PermissionDenied,
+			codes.ResourceExhausted,
+			codes.FailedPrecondition,
+			codes.Aborted,
+			codes.OutOfRange,
+			codes.Unimplemented,
+			codes.Internal,
+			codes.Unavailable,
+			codes.DataLoss,
+			codes.Unauthenticated:
+			h.sendMessage(chatID, "Не удалось добавить ссылку. Попробуйте позже.")
 		default:
 			h.sendMessage(chatID, "Не удалось добавить ссылку. Попробуйте позже.")
 		}
@@ -90,31 +109,31 @@ func (h *Handler) finishTrack(chatID int64, link string, tags []string, filters 
 	h.sendMessage(chatID, fmt.Sprintf("Ссылка добавлена в отслеживание: %s", link))
 }
 
-func validateSupportedURL(raw string) (*url.URL, error) {
+func validateSupportedURL(raw string) error {
 	u, err := url.ParseRequestURI(strings.TrimSpace(raw))
 	if err != nil {
-		return nil, fmt.Errorf("parse url: %w", err)
+		return fmt.Errorf("parse url: %w", err)
 	}
 
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("unsupported scheme: %s", u.Scheme)
+		return fmt.Errorf("unsupported scheme: %s", u.Scheme)
 	}
 
 	switch strings.ToLower(u.Host) {
 	case githubHost:
 		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
 		if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
-			return nil, fmt.Errorf("invalid github link")
+			return errors.New("invalid github link")
 		}
 	case stackOverflowHost:
 		if !stackOverflowQuestionPath.MatchString(u.Path) {
-			return nil, fmt.Errorf("invalid stackoverflow link")
+			return errors.New("invalid stackoverflow link")
 		}
 	default:
-		return nil, fmt.Errorf("unsupported host: %s", u.Host)
+		return fmt.Errorf("unsupported host: %s", u.Host)
 	}
 
-	return u, nil
+	return nil
 }
 
 func parseListInput(raw string) []string {

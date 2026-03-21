@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -18,7 +19,7 @@ type Config struct {
 func Load() (*Config, error) {
 	v, err := configpkg.NewViperFromEnvFile(".env")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new viper: %w", err)
 	}
 
 	_ = v.BindEnv("app_telegram_token")
@@ -31,8 +32,9 @@ func Load() (*Config, error) {
 	v.SetDefault("grpc_timeout", "3s")
 
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	unmarshalErr := v.Unmarshal(&cfg)
+	if unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
 	}
 
 	cfg.AppTelegramToken = strings.TrimSpace(cfg.AppTelegramToken)
@@ -40,16 +42,16 @@ func Load() (*Config, error) {
 	cfg.ScrapperGRPCAddr = strings.TrimSpace(cfg.ScrapperGRPCAddr)
 
 	if cfg.AppTelegramToken == "" {
-		return nil, fmt.Errorf("APP_TELEGRAM_TOKEN is required")
+		return nil, errors.New("APP_TELEGRAM_TOKEN is required")
 	}
 	if cfg.BotGRPCAddr == "" {
-		return nil, fmt.Errorf("BOT_GRPC_ADDR is required")
+		return nil, errors.New("BOT_GRPC_ADDR is required")
 	}
 	if cfg.ScrapperGRPCAddr == "" {
-		return nil, fmt.Errorf("SCRAPPER_GRPC_ADDR is required")
+		return nil, errors.New("SCRAPPER_GRPC_ADDR is required")
 	}
 	if cfg.GRPCTimeout <= 0 {
-		return nil, fmt.Errorf("GRPC_TIMEOUT must be positive")
+		return nil, errors.New("GRPC_TIMEOUT must be positive")
 	}
 
 	return &cfg, nil

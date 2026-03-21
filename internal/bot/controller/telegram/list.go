@@ -31,6 +31,23 @@ func newListCommand(h *Handler) command {
 				switch grpcadapter.StatusCode(err) {
 				case codes.NotFound:
 					h.sendMessage(chatID, "Сначала выполните /start, чтобы зарегистрировать чат.")
+				case codes.OK,
+					codes.Canceled,
+					codes.Unknown,
+					codes.InvalidArgument,
+					codes.DeadlineExceeded,
+					codes.AlreadyExists,
+					codes.PermissionDenied,
+					codes.ResourceExhausted,
+					codes.FailedPrecondition,
+					codes.Aborted,
+					codes.OutOfRange,
+					codes.Unimplemented,
+					codes.Internal,
+					codes.Unavailable,
+					codes.DataLoss,
+					codes.Unauthenticated:
+					h.sendMessage(chatID, "Не удалось получить список ссылок. Попробуйте позже.")
 				default:
 					h.sendMessage(chatID, "Не удалось получить список ссылок. Попробуйте позже.")
 				}
@@ -46,7 +63,7 @@ func newListCommand(h *Handler) command {
 			var sb strings.Builder
 			sb.WriteString(formatTrackedLinks(links))
 			if tag != "" {
-				sb.WriteString(fmt.Sprintf("\n\nФильтр по тегу: %s", tag))
+				_, _ = fmt.Fprintf(&sb, "\n\nФильтр по тегу: %s", tag)
 			}
 
 			h.sendMessage(chatID, sb.String())

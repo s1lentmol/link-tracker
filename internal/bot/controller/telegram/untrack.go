@@ -31,7 +31,7 @@ func newUntrackCommand(h *Handler) command {
 }
 
 func (h *Handler) executeUntrack(chatID int64, link string) {
-	if _, err := validateSupportedURL(link); err != nil {
+	if err := validateSupportedURL(link); err != nil {
 		h.sendMessage(chatID, "Некорректная ссылка. Поддерживаются GitHub репозитории и вопросы StackOverflow.")
 		return
 	}
@@ -48,6 +48,23 @@ func (h *Handler) executeUntrack(chatID int64, link string) {
 		switch grpcadapter.StatusCode(err) {
 		case codes.NotFound:
 			h.sendMessage(chatID, "Ссылка не найдена в отслеживаемых.")
+		case codes.OK,
+			codes.Canceled,
+			codes.Unknown,
+			codes.InvalidArgument,
+			codes.DeadlineExceeded,
+			codes.AlreadyExists,
+			codes.PermissionDenied,
+			codes.ResourceExhausted,
+			codes.FailedPrecondition,
+			codes.Aborted,
+			codes.OutOfRange,
+			codes.Unimplemented,
+			codes.Internal,
+			codes.Unavailable,
+			codes.DataLoss,
+			codes.Unauthenticated:
+			h.sendMessage(chatID, "Не удалось удалить ссылку. Попробуйте позже.")
 		default:
 			h.sendMessage(chatID, "Не удалось удалить ссылку. Попробуйте позже.")
 		}

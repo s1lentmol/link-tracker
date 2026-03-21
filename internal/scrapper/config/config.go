@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -24,10 +25,13 @@ type Config struct {
 	StackBaseURL      string        `mapstructure:"stack_base_url"`
 }
 
+const defaultDBMaxConns = 10
+
+//nolint:funlen // config loading validates many independent environment fields.
 func Load() (*Config, error) {
 	v, err := configpkg.NewViperFromEnvFile(".env")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new viper: %w", err)
 	}
 
 	_ = v.BindEnv("scrapper_grpc_addr")
@@ -50,7 +54,7 @@ func Load() (*Config, error) {
 	v.SetDefault("db_access_type", "sql")
 	v.SetDefault("db_migrations_path", "migrations")
 	v.SetDefault("db_auto_migrate", true)
-	v.SetDefault("db_max_conns", 10)
+	v.SetDefault("db_max_conns", defaultDBMaxConns)
 	v.SetDefault("db_min_conns", 1)
 	v.SetDefault("scheduler_interval", "30s")
 	v.SetDefault("http_timeout", "10s")
@@ -59,8 +63,9 @@ func Load() (*Config, error) {
 	v.SetDefault("stack_base_url", "https://api.stackexchange.com/2.3")
 
 	var cfg Config
-	if err := v.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	unmarshalErr := v.Unmarshal(&cfg)
+	if unmarshalErr != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", unmarshalErr)
 	}
 
 	cfg.ScrapperGRPCAddr = strings.TrimSpace(cfg.ScrapperGRPCAddr)
@@ -72,40 +77,40 @@ func Load() (*Config, error) {
 	cfg.StackBaseURL = strings.TrimSpace(cfg.StackBaseURL)
 
 	if cfg.ScrapperGRPCAddr == "" {
-		return nil, fmt.Errorf("SCRAPPER_GRPC_ADDR is required")
+		return nil, errors.New("SCRAPPER_GRPC_ADDR is required")
 	}
 	if cfg.BotGRPCAddr == "" {
-		return nil, fmt.Errorf("BOT_GRPC_ADDR is required")
+		return nil, errors.New("BOT_GRPC_ADDR is required")
 	}
 	if cfg.DBDsn == "" {
-		return nil, fmt.Errorf("DB_DSN is required")
+		return nil, errors.New("DB_DSN is required")
 	}
 	if cfg.DBAccessType != "sql" && cfg.DBAccessType != "squirrel" {
-		return nil, fmt.Errorf("DB_ACCESS_TYPE must be one of: sql, squirrel")
+		return nil, errors.New("DB_ACCESS_TYPE must be one of: sql, squirrel")
 	}
 	if cfg.DBMigrationsPath == "" {
-		return nil, fmt.Errorf("DB_MIGRATIONS_PATH is required")
+		return nil, errors.New("DB_MIGRATIONS_PATH is required")
 	}
 	if cfg.DBMaxConns <= 0 {
-		return nil, fmt.Errorf("DB_MAX_CONNS must be positive")
+		return nil, errors.New("DB_MAX_CONNS must be positive")
 	}
 	if cfg.DBMinConns < 0 {
-		return nil, fmt.Errorf("DB_MIN_CONNS must be non-negative")
+		return nil, errors.New("DB_MIN_CONNS must be non-negative")
 	}
 	if cfg.DBMinConns > cfg.DBMaxConns {
-		return nil, fmt.Errorf("DB_MIN_CONNS must be <= DB_MAX_CONNS")
+		return nil, errors.New("DB_MIN_CONNS must be <= DB_MAX_CONNS")
 	}
 	if cfg.SchedulerInterval <= 0 {
-		return nil, fmt.Errorf("SCHEDULER_INTERVAL must be positive")
+		return nil, errors.New("SCHEDULER_INTERVAL must be positive")
 	}
 	if cfg.HTTPTimeout <= 0 {
-		return nil, fmt.Errorf("HTTP_TIMEOUT must be positive")
+		return nil, errors.New("HTTP_TIMEOUT must be positive")
 	}
 	if cfg.GRPCTimeout <= 0 {
-		return nil, fmt.Errorf("GRPC_TIMEOUT must be positive")
+		return nil, errors.New("GRPC_TIMEOUT must be positive")
 	}
 	if cfg.GitHubBaseURL == "" || cfg.StackBaseURL == "" {
-		return nil, fmt.Errorf("GITHUB_BASE_URL and STACK_BASE_URL are required")
+		return nil, errors.New("GITHUB_BASE_URL and STACK_BASE_URL are required")
 	}
 
 	return &cfg, nil

@@ -3,6 +3,7 @@ package stackoverflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -29,7 +30,9 @@ func (c *Client) QuestionUpdatedAt(ctx context.Context, id string) (time.Time, e
 	if err != nil {
 		return time.Time{}, fmt.Errorf("do request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return time.Time{}, fmt.Errorf("stackoverflow status: %d", resp.StatusCode)
@@ -40,11 +43,12 @@ func (c *Client) QuestionUpdatedAt(ctx context.Context, id string) (time.Time, e
 			LastActivityDate int64 `json:"last_activity_date"`
 		} `json:"items"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return time.Time{}, fmt.Errorf("decode body: %w", err)
+	decodeErr := json.NewDecoder(resp.Body).Decode(&payload)
+	if decodeErr != nil {
+		return time.Time{}, fmt.Errorf("decode body: %w", decodeErr)
 	}
 	if len(payload.Items) == 0 || payload.Items[0].LastActivityDate == 0 {
-		return time.Time{}, fmt.Errorf("missing last_activity_date")
+		return time.Time{}, errors.New("missing last_activity_date")
 	}
 
 	return time.Unix(payload.Items[0].LastActivityDate, 0).UTC(), nil

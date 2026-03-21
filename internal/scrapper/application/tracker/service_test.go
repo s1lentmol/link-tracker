@@ -156,7 +156,7 @@ func (r *memoryRepo) RemoveLink(_ context.Context, chatID int64, rawURL string) 
 	delete(r.subscriptions[chatID], rawURL)
 
 	linkID := r.idByURL[rawURL]
-	if res, ok := r.resourcesByID[linkID]; ok {
+	if res, resourceExists := r.resourcesByID[linkID]; resourceExists {
 		res.ChatIDs = removeChat(res.ChatIDs, chatID)
 		if len(res.ChatIDs) == 0 {
 			delete(r.resourcesByID, linkID)
@@ -358,7 +358,7 @@ func TestService_CheckUpdates_GitHub(t *testing.T) {
 	// Первый проход: только инициализация lastUpdate, без уведомления.
 	svc.CheckUpdates(context.Background())
 	calls := notify.Calls()
-	require.Len(t, calls, 0)
+	require.Empty(t, calls)
 
 	updatedAtMu.Lock()
 	updatedAt = updatedAt.Add(5 * time.Minute)

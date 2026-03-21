@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -36,12 +37,13 @@ func Run(logger *slog.Logger) error {
 		return fmt.Errorf("create scrapper grpc client: %w", err)
 	}
 	defer func() {
-		if err := scrapperClient.Close(); err != nil {
-			logger.Warn("failed to close scrapper grpc connection", slog.String("error", err.Error()))
+		if closeErr := scrapperClient.Close(); closeErr != nil {
+			logger.Warn("failed to close scrapper grpc connection", slog.String("error", closeErr.Error()))
 		}
 	}()
 
-	grpcListener, err := net.Listen("tcp", cfg.BotGRPCAddr)
+	var listenConfig net.ListenConfig
+	grpcListener, err := listenConfig.Listen(context.Background(), "tcp", cfg.BotGRPCAddr)
 	if err != nil {
 		return fmt.Errorf("listen bot grpc on %s: %w", cfg.BotGRPCAddr, err)
 	}
@@ -52,9 +54,9 @@ func Run(logger *slog.Logger) error {
 	serveErr := make(chan error, 1)
 	go func() {
 		logger.Info("bot grpc server started", slog.String("addr", cfg.BotGRPCAddr))
-		if err := grpcServer.Serve(grpcListener); err != nil {
-			if !errors.Is(err, grpc.ErrServerStopped) {
-				serveErr <- err
+		if serveErrValue := grpcServer.Serve(grpcListener); serveErrValue != nil {
+			if !errors.Is(serveErrValue, grpc.ErrServerStopped) {
+				serveErr <- serveErrValue
 			}
 		}
 	}()
@@ -86,10 +88,10 @@ func Run(logger *slog.Logger) error {
 			bot.StopReceivingUpdates()
 			grpcServer.GracefulStop()
 			return nil
-		case err := <-serveErr:
+		case grpcServeErr := <-serveErr:
 			bot.StopReceivingUpdates()
 			grpcServer.GracefulStop()
-			return fmt.Errorf("bot grpc server stopped unexpectedly: %w", err)
+			return fmt.Errorf("bot grpc server stopped unexpectedly: %w", grpcServeErr)
 		}
 	}
 }

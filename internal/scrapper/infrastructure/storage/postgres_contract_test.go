@@ -3,6 +3,7 @@ package storage_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -21,10 +22,6 @@ import (
 func TestPostgresRepositoriesContract(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.Background()
-	dsn, stop := startPostgresWithMigrations(t, ctx)
-	defer stop()
-
 	tests := []struct {
 		name    string
 		factory func(pool *pgxpool.Pool) storage.Repository
@@ -34,57 +31,59 @@ func TestPostgresRepositoriesContract(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			pool := mustConnectPool(t, ctx, dsn)
-			defer pool.Close()
+		ctx := context.Background()
+		dsn, stop := startPostgresWithMigrations(ctx, t)
+		pool := mustConnectPool(ctx, t, dsn)
 
-			repo := tt.factory(pool)
+		repo := tt.factory(pool)
 
-			require.NoError(t, repo.RegisterChat(ctx, 101))
+		require.NoError(t, repo.RegisterChat(ctx, 101), tt.name)
 
-			sub, err := repo.AddLink(ctx, 101, "https://github.com/org/repo", []string{"work", "backend"}, []string{"is:open"})
-			require.NoError(t, err)
-			require.NotNil(t, sub)
+		sub, err := repo.AddLink(ctx, 101, "https://github.com/org/repo", []string{"work", "backend"}, []string{"is:open"})
+		require.NoError(t, err, tt.name)
+		require.NotNil(t, sub, tt.name)
 
-			_, err = repo.AddLink(ctx, 101, "https://github.com/org/repo", nil, nil)
-			require.Error(t, err)
-			assert.ErrorIs(t, err, apperr.ErrLinkExists)
+		_, err = repo.AddLink(ctx, 101, "https://github.com/org/repo", nil, nil)
+		require.Error(t, err, tt.name)
+		require.ErrorIs(t, err, apperr.ErrLinkExists, tt.name)
 
-			list, err := repo.ListLinks(ctx, 101)
-			require.NoError(t, err)
-			require.Len(t, list, 1)
-			assert.Equal(t, "https://github.com/org/repo", list[0].URL)
-			assert.ElementsMatch(t, []string{"work", "backend"}, list[0].Tags)
-			assert.ElementsMatch(t, []string{"is:open"}, list[0].Filters)
+		list, err := repo.ListLinks(ctx, 101)
+		require.NoError(t, err, tt.name)
+		require.Len(t, list, 1, tt.name)
+		assert.Equal(t, "https://github.com/org/repo", list[0].URL, tt.name)
+		assert.ElementsMatch(t, []string{"work", "backend"}, list[0].Tags, tt.name)
+		assert.ElementsMatch(t, []string{"is:open"}, list[0].Filters, tt.name)
 
-			require.NoError(t, repo.AddTag(ctx, 101, "https://github.com/org/repo", "urgent"))
-			tags, err := repo.ListTags(ctx, 101, "https://github.com/org/repo")
-			require.NoError(t, err)
-			assert.ElementsMatch(t, []string{"backend", "work", "urgent"}, tags)
+		require.NoError(t, repo.AddTag(ctx, 101, "https://github.com/org/repo", "urgent"), tt.name)
+		tags, err := repo.ListTags(ctx, 101, "https://github.com/org/repo")
+		require.NoError(t, err, tt.name)
+		assert.ElementsMatch(t, []string{"backend", "work", "urgent"}, tags, tt.name)
 
-			err = repo.AddTag(ctx, 101, "https://github.com/org/repo", "urgent")
-			require.Error(t, err)
-			assert.ErrorIs(t, err, apperr.ErrTagExists)
+		err = repo.AddTag(ctx, 101, "https://github.com/org/repo", "urgent")
+		require.Error(t, err, tt.name)
+		require.ErrorIs(t, err, apperr.ErrTagExists, tt.name)
 
-			require.NoError(t, repo.RemoveTag(ctx, 101, "https://github.com/org/repo", "urgent"))
-			tags, err = repo.ListTags(ctx, 101, "https://github.com/org/repo")
-			require.NoError(t, err)
-			assert.ElementsMatch(t, []string{"backend", "work"}, tags)
+		require.NoError(t, repo.RemoveTag(ctx, 101, "https://github.com/org/repo", "urgent"), tt.name)
+		tags, err = repo.ListTags(ctx, 101, "https://github.com/org/repo")
+		require.NoError(t, err, tt.name)
+		assert.ElementsMatch(t, []string{"backend", "work"}, tags, tt.name)
 
-			err = repo.RemoveTag(ctx, 101, "https://github.com/org/repo", "urgent")
-			require.Error(t, err)
-			assert.ErrorIs(t, err, apperr.ErrTagNotFound)
+		err = repo.RemoveTag(ctx, 101, "https://github.com/org/repo", "urgent")
+		require.Error(t, err, tt.name)
+		require.ErrorIs(t, err, apperr.ErrTagNotFound, tt.name)
 
-			_, err = repo.RemoveLink(ctx, 101, "https://github.com/org/repo")
-			require.NoError(t, err)
+		_, err = repo.RemoveLink(ctx, 101, "https://github.com/org/repo")
+		require.NoError(t, err, tt.name)
 
-			list, err = repo.ListLinks(ctx, 101)
-			require.NoError(t, err)
-			assert.Empty(t, list)
+		list, err = repo.ListLinks(ctx, 101)
+		require.NoError(t, err, tt.name)
+		assert.Empty(t, list, tt.name)
 
-			err = repo.DeleteChat(ctx, 101)
-			require.NoError(t, err)
-		})
+		err = repo.DeleteChat(ctx, 101)
+		require.NoError(t, err, tt.name)
+
+		pool.Close()
+		stop()
 	}
 }
 
@@ -100,24 +99,12 @@ func TestMigrationsApplyOnCleanDatabase(t *testing.T) {
 		_ = container.Terminate(ctx)
 	}()
 
-	tests := []struct {
-		name string
-		path string
-	}{
-		{name: "apply_up_on_clean_db", path: "../../../../migrations"},
+	retryErr := retryMigrate(dsn, "../../../../migrations", 10, 500*time.Millisecond)
+	if retryErr != nil {
+		t.Skipf("postgres not ready for migrations: %v", retryErr)
 	}
 
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			err := retryMigrate(dsn, tt.path, 10, 500*time.Millisecond)
-			if err != nil {
-				t.Skipf("postgres not ready for migrations: %v", err)
-			}
-		})
-	}
-
-	pool := mustConnectPool(t, ctx, dsn)
+	pool := mustConnectPool(ctx, t, dsn)
 	defer pool.Close()
 
 	var count int
@@ -131,7 +118,7 @@ func TestMigrationsApplyOnCleanDatabase(t *testing.T) {
 	assert.Equal(t, 5, count)
 }
 
-func startPostgresWithMigrations(t *testing.T, ctx context.Context) (string, func()) {
+func startPostgresWithMigrations(ctx context.Context, t *testing.T) (string, func()) {
 	t.Helper()
 
 	container, dsn, err := startPostgresContainer(ctx)
@@ -139,9 +126,10 @@ func startPostgresWithMigrations(t *testing.T, ctx context.Context) (string, fun
 		t.Skipf("testcontainers unavailable: %v", err)
 	}
 
-	if err := retryMigrate(dsn, "../../../../migrations", 10, 500*time.Millisecond); err != nil {
+	migrationErr := retryMigrate(dsn, "../../../../migrations", 10, 500*time.Millisecond)
+	if migrationErr != nil {
 		_ = container.Terminate(ctx)
-		t.Skipf("postgres not ready for migrations: %v", err)
+		t.Skipf("postgres not ready for migrations: %v", migrationErr)
 	}
 
 	stop := func() {
@@ -151,8 +139,16 @@ func startPostgresWithMigrations(t *testing.T, ctx context.Context) (string, fun
 	return dsn, stop
 }
 
-func startPostgresContainer(ctx context.Context) (*tcpostgres.PostgresContainer, string, error) {
-	container, err := tcpostgres.Run(
+func startPostgresContainer(ctx context.Context) (container *tcpostgres.PostgresContainer, dsn string, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			container = nil
+			dsn = ""
+			err = fmt.Errorf("testcontainers panic: %v", recovered)
+		}
+	}()
+
+	container, err = tcpostgres.Run(
 		ctx,
 		"postgres:16-alpine",
 		tcpostgres.WithDatabase("linktracker"),
@@ -163,7 +159,7 @@ func startPostgresContainer(ctx context.Context) (*tcpostgres.PostgresContainer,
 		return nil, "", err
 	}
 
-	dsn, err := container.ConnectionString(ctx, "sslmode=disable")
+	dsn, err = container.ConnectionString(ctx, "sslmode=disable")
 	if err != nil {
 		_ = container.Terminate(ctx)
 		return nil, "", err
@@ -172,7 +168,7 @@ func startPostgresContainer(ctx context.Context) (*tcpostgres.PostgresContainer,
 	return container, dsn, nil
 }
 
-func mustConnectPool(t *testing.T, ctx context.Context, dsn string) *pgxpool.Pool {
+func mustConnectPool(ctx context.Context, t *testing.T, dsn string) *pgxpool.Pool {
 	t.Helper()
 
 	pool, err := pgxpool.New(ctx, dsn)
@@ -183,12 +179,12 @@ func mustConnectPool(t *testing.T, ctx context.Context, dsn string) *pgxpool.Poo
 
 func retryMigrate(dsn string, migrationsPath string, attempts int, delay time.Duration) error {
 	var lastErr error
-	for i := 0; i < attempts; i++ {
-		if err := migrateinfra.Up(migrationsPath, dsn); err == nil {
+	for range attempts {
+		upErr := migrateinfra.Up(migrationsPath, dsn)
+		if upErr == nil {
 			return nil
-		} else {
-			lastErr = err
 		}
+		lastErr = upErr
 		time.Sleep(delay)
 	}
 	if lastErr == nil {

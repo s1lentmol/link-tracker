@@ -1,6 +1,8 @@
 package telegram
 
 import (
+	"fmt"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -11,7 +13,7 @@ type Bot struct {
 func New(token string) (*Bot, error) {
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("new bot api: %w", err)
 	}
 
 	return &Bot{api: api}, nil
@@ -20,7 +22,10 @@ func New(token string) (*Bot, error) {
 func (b *Bot) SendMessage(chatID int64, text string) error {
 	msg := tgbotapi.NewMessage(chatID, text)
 	_, err := b.api.Send(msg)
-	return err
+	if err != nil {
+		return fmt.Errorf("send telegram message: %w", err)
+	}
+	return nil
 }
 
 func (b *Bot) SetCommands(commands map[string]string) error {
@@ -33,7 +38,10 @@ func (b *Bot) SetCommands(commands map[string]string) error {
 	}
 
 	_, err := b.api.Request(tgbotapi.NewSetMyCommands(botCommands...))
-	return err
+	if err != nil {
+		return fmt.Errorf("set telegram commands: %w", err)
+	}
+	return nil
 }
 
 func (b *Bot) GetUpdatesChan(config tgbotapi.UpdateConfig) tgbotapi.UpdatesChannel {

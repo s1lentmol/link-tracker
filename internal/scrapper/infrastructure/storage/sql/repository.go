@@ -1,3 +1,4 @@
+//nolint:govet // shadowing of short-lived err variables keeps multi-step SQL flows concise in this repository.
 package sql
 
 import (
@@ -41,7 +42,9 @@ func (r *Repository) DeleteChat(ctx context.Context, chatID int64) error {
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	tag, err := tx.Exec(ctx, `DELETE FROM chats WHERE id = $1`, chatID)
 	if err != nil {
@@ -67,7 +70,9 @@ func (r *Repository) AddLink(ctx context.Context, chatID int64, url string, tags
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	if exists, err := chatExists(ctx, tx, chatID); err != nil {
 		return nil, err
@@ -132,7 +137,9 @@ func (r *Repository) RemoveLink(ctx context.Context, chatID int64, url string) (
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	if exists, err := chatExists(ctx, tx, chatID); err != nil {
 		return nil, err
@@ -197,14 +204,12 @@ func (r *Repository) ListLinks(ctx context.Context, chatID int64) ([]domain.Subs
 	defer rows.Close()
 
 	subs := make([]domain.Subscription, 0)
-	ids := make([]int64, 0)
 	for rows.Next() {
 		var sub domain.Subscription
 		if err := rows.Scan(&sub.ID, &sub.URL); err != nil {
 			return nil, fmt.Errorf("scan link: %w", err)
 		}
 		subs = append(subs, sub)
-		ids = append(ids, sub.ID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate links: %w", err)
@@ -408,10 +413,6 @@ func (r *Repository) SetLastUpdateByLinkID(ctx context.Context, linkID int64, ts
 
 type queryRower interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
-}
-
-type queryExecer interface {
-	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 }
 
 type queryer interface {

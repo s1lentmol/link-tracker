@@ -69,6 +69,62 @@ func New(bot Bot, logger *slog.Logger, opts ...Option) *Handler {
 	return h
 }
 
+func (h *Handler) HandleUpdate(update tgbotapi.Update) {
+	if update.Message == nil {
+		return
+	}
+
+	chatID := update.Message.Chat.ID
+	state := h.stateStore.Get(chatID)
+
+	if update.Message.IsCommand() {
+		h.handleCommand(update, state)
+		return
+	}
+
+	if state.Active() {
+		h.handleDialogInput(update, state)
+		return
+	}
+
+	h.handleUnknown(update)
+}
+
+func (h *Handler) handleCommand(update tgbotapi.Update, state DialogState) {
+	chatID := update.Message.Chat.ID
+	cmdName := update.Message.Command()
+
+	if state.Active() {
+		if cmdName == "cancel" {
+			h.stateStore.Clear(chatID)
+			h.sendMessage(chatID, "Действие отменено.")
+			return
+		}
+
+		h.stateStore.Clear(chatID)
+		h.sendMessage(chatID, "Процесс отслеживания отменён.")
+	}
+
+	cmd, ok := h.commands[cmdName]
+	if !ok {
+		h.handleUnknown(update)
+		return
+	}
+
+	username := ""
+	if update.Message.From != nil {
+		username = update.Message.From.UserName
+	}
+
+	h.logger.Info("handling command",
+		slog.String("command", cmdName),
+		slog.Int64("chat_id", update.Message.Chat.ID),
+		slog.String("username", username),
+	)
+
+	cmd.handle(update)
+}
+
 func (h *Handler) registerCommands() {
 	cmds := []command{
 		newStartCommand(h),
@@ -97,57 +153,6 @@ func (h *Handler) setMyCommands() {
 	}
 }
 
-func (h *Handler) HandleUpdate(update tgbotapi.Update) {
-	if update.Message == nil {
-		return
-	}
-
-	chatID := update.Message.Chat.ID
-	state := h.stateStore.Get(chatID)
-
-	if update.Message.IsCommand() {
-		cmdName := update.Message.Command()
-
-		if state.Active() {
-			if cmdName == "cancel" {
-				h.stateStore.Clear(chatID)
-				h.sendMessage(chatID, "Действие отменено.")
-				return
-			}
-
-			h.stateStore.Clear(chatID)
-			h.sendMessage(chatID, "Процесс отслеживания отменён.")
-		}
-
-		cmd, ok := h.commands[cmdName]
-		if !ok {
-			h.handleUnknown(update)
-			return
-		}
-
-		username := ""
-		if update.Message.From != nil {
-			username = update.Message.From.UserName
-		}
-
-		h.logger.Info("handling command",
-			slog.String("command", cmdName),
-			slog.Int64("chat_id", update.Message.Chat.ID),
-			slog.String("username", username),
-		)
-
-		cmd.handle(update)
-		return
-	}
-
-	if state.Active() {
-		h.handleDialogInput(update, state)
-		return
-	}
-
-	h.handleUnknown(update)
-}
-
 func (h *Handler) sendMessage(chatID int64, text string) {
 	if err := h.bot.SendMessage(chatID, text); err != nil {
 		h.logger.Error("failed to send message",
@@ -163,22 +168,22 @@ func statusCode(err error) string {
 
 type noopScrapperService struct{}
 
-func (noopScrapperService) RegisterChat(chatID int64) error {
+func (noopScrapperService) RegisterChat(_ int64) error {
 	return nil
 }
 
-func (noopScrapperService) DeleteChat(chatID int64) error {
+func (noopScrapperService) DeleteChat(_ int64) error {
 	return nil
 }
 
-func (noopScrapperService) AddLink(chatID int64, link string, tags []string, filters []string) (*pb.LinkResponse, error) {
+func (noopScrapperService) AddLink(_ int64, link string, tags []string, filters []string) (*pb.LinkResponse, error) {
 	return &pb.LinkResponse{Id: 1, Url: link, Tags: tags, Filters: filters}, nil
 }
 
-func (noopScrapperService) RemoveLink(chatID int64, link string) (*pb.LinkResponse, error) {
+func (noopScrapperService) RemoveLink(_ int64, link string) (*pb.LinkResponse, error) {
 	return &pb.LinkResponse{Id: 1, Url: link}, nil
 }
 
-func (noopScrapperService) ListLinks(chatID int64) (*pb.ListLinksResponse, error) {
+func (noopScrapperService) ListLinks(_ int64) (*pb.ListLinksResponse, error) {
 	return &pb.ListLinksResponse{}, nil
 }

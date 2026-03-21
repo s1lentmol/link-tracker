@@ -33,7 +33,10 @@ func NewBotClient(addr string, timeout time.Duration, logger *slog.Logger) (*Bot
 }
 
 func (c *BotClient) Close() error {
-	return c.conn.Close()
+	if err := c.conn.Close(); err != nil {
+		return fmt.Errorf("close grpc client connection: %w", err)
+	}
+	return nil
 }
 
 func (c *BotClient) SendUpdate(id int64, url string, description string, chatIDs []int64) error {

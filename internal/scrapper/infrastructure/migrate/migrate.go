@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
+	// Register postgres driver for golang-migrate.
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	// Register file source driver for golang-migrate.
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
@@ -15,8 +17,9 @@ func Up(migrationsPath string, dsn string) error {
 		return fmt.Errorf("create migrate instance: %w", err)
 	}
 
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return fmt.Errorf("run migrations up: %w", err)
+	upErr := m.Up()
+	if upErr != nil && !errors.Is(upErr, migrate.ErrNoChange) {
+		return fmt.Errorf("run migrations up: %w", upErr)
 	}
 
 	return nil

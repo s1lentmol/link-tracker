@@ -1,3 +1,4 @@
+//nolint:govet,dupl // this repository intentionally uses short-lived shadowed errors and similar SQL helper shapes for readability.
 package squirrel
 
 import (
@@ -49,7 +50,9 @@ func (r *Repository) DeleteChat(ctx context.Context, chatID int64) error {
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	query, args, err := r.sb.Delete("chats").Where(sq.Eq{"id": chatID}).ToSql()
 	if err != nil {
@@ -84,7 +87,9 @@ func (r *Repository) AddLink(ctx context.Context, chatID int64, url string, tags
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	exists, err := r.chatExists(ctx, tx, chatID)
 	if err != nil {
@@ -160,7 +165,9 @@ func (r *Repository) RemoveLink(ctx context.Context, chatID int64, url string) (
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	exists, err := r.chatExists(ctx, tx, chatID)
 	if err != nil {

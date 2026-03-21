@@ -37,7 +37,10 @@ func NewScrapperClient(addr string, timeout time.Duration, logger *slog.Logger) 
 }
 
 func (c *ScrapperClient) Close() error {
-	return c.conn.Close()
+	if err := c.conn.Close(); err != nil {
+		return fmt.Errorf("close grpc client connection: %w", err)
+	}
+	return nil
 }
 
 func (c *ScrapperClient) RegisterChat(chatID int64) error {
