@@ -13,15 +13,19 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 
+	appstorage "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/application/storage"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/application/tracker"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/config"
 	grpccontroller "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/controller/grpc"
 	grpcadapter "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/grpc"
 	ghclient "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/github"
 	stackclient "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/stackoverflow"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage"
+	migrateinfra "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/migrate"
+	sqlrepo "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage/sql"
+	squirrelrepo "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage/squirrel"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/pkg/grpcx"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/shared/pb"
 )
@@ -32,7 +36,33 @@ func Run(logger *slog.Logger) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	repo := storage.NewRepository()
+	if cfg.DBAutoMigrate {
+		if err := migrateinfra.Up(cfg.DBMigrationsPath, cfg.DBDsn); err != nil {
+			return fmt.Errorf("run migrations: %w", err)
+		}
+	}
+
+	pgxCfg, err := pgxpool.ParseConfig(cfg.DBDsn)
+	if err != nil {
+		return fmt.Errorf("parse DB_DSN: %w", err)
+	}
+	pgxCfg.MaxConns = cfg.DBMaxConns
+	pgxCfg.MinConns = cfg.DBMinConns
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), pgxCfg)
+	if err != nil {
+		return fmt.Errorf("create pgx pool: %w", err)
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(context.Background()); err != nil {
+		return fmt.Errorf("ping postgres: %w", err)
+	}
+
+	repo, err := newRepository(cfg.DBAccessType, pool)
+	if err != nil {
+		return err
+	}
 
 	botClient, err := grpcadapter.NewBotClient(cfg.BotGRPCAddr, cfg.GRPCTimeout, logger)
 	if err != nil {
@@ -92,5 +122,16 @@ func Run(logger *slog.Logger) error {
 		scheduler.Stop()
 		grpcServer.GracefulStop()
 		return fmt.Errorf("scrapper grpc server stopped unexpectedly: %w", err)
+	}
+}
+
+func newRepository(accessType string, pool *pgxpool.Pool) (appstorage.Repository, error) {
+	switch accessType {
+	case "sql":
+		return sqlrepo.New(pool), nil
+	case "squirrel":
+		return squirrelrepo.New(pool), nil
+	default:
+		return nil, fmt.Errorf("unsupported DB_ACCESS_TYPE: %s", accessType)
 	}
 }

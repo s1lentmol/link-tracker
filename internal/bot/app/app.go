@@ -12,11 +12,9 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"google.golang.org/grpc"
 
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/application/user"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/config"
 	handler "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/controller/telegram"
 	grpcadapter "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/infrastructure/grpc"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/infrastructure/storage"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/infrastructure/telegram"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/pkg/grpcx"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/shared/pb"
@@ -63,9 +61,7 @@ func Run(logger *slog.Logger) error {
 
 	logger.Info("bot authorized", slog.String("username", bot.GetUserName()))
 
-	userRepo := storage.NewUserRepository()
-	userUseCase := user.NewUseCase(userRepo)
-	h := handler.New(bot, userUseCase, logger, handler.WithScrapperService(scrapperClient))
+	h := handler.New(bot, logger, handler.WithScrapperService(scrapperClient))
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
