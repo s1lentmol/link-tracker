@@ -36,6 +36,14 @@ APP_TELEGRAM_TOKEN=your_telegram_token
 SCRAPPER_GRPC_ADDR=:8081
 BOT_GRPC_ADDR=:8082
 
+# PostgreSQL
+DB_DSN=postgres://postgres:postgres@localhost:5432/linktracker?sslmode=disable
+DB_ACCESS_TYPE=sql
+DB_MIGRATIONS_PATH=./migrations
+DB_AUTO_MIGRATE=true
+DB_MAX_CONNS=10
+DB_MIN_CONNS=1
+
 # Интервалы/таймауты
 SCHEDULER_INTERVAL=30s
 HTTP_TIMEOUT=10s
@@ -70,7 +78,7 @@ go run ./cmd/bot
 cp .env.example .env
 ```
 
-2. Поднимите оба сервиса:
+2. Поднимите все сервисы (postgres + migrate + scrapper + bot):
 
 ```bash
 docker compose up --build
