@@ -24,7 +24,7 @@ import (
 	ghclient "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/github"
 	stackclient "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/stackoverflow"
 	migrateinfra "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/migrate"
-	sqlrepo "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage/sql"
+	rawsqlrepo "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage/rawsql"
 	squirrelrepo "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage/squirrel"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/pkg/grpcx"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/shared/pb"
@@ -131,7 +131,7 @@ func Run(logger *slog.Logger) error {
 func newRepository(accessType string, pool *pgxpool.Pool) (appstorage.Repository, error) {
 	switch accessType {
 	case "sql":
-		return sqlrepo.New(pool), nil
+		return rawsqlrepo.New(pool), nil
 	case "squirrel":
 		return squirrelrepo.New(pool), nil
 	default:

@@ -15,7 +15,7 @@ import (
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/apperr"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/application/storage"
 	migrateinfra "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/migrate"
-	sqlrepo "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage/sql"
+	rawsqlrepo "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage/rawsql"
 	squirrelrepo "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage/squirrel"
 )
 
@@ -26,7 +26,7 @@ func TestPostgresRepositoriesContract(t *testing.T) {
 		name    string
 		factory func(pool *pgxpool.Pool) storage.Repository
 	}{
-		{name: "sql", factory: func(pool *pgxpool.Pool) storage.Repository { return sqlrepo.New(pool) }},
+		{name: "sql", factory: func(pool *pgxpool.Pool) storage.Repository { return rawsqlrepo.New(pool) }},
 		{name: "squirrel", factory: func(pool *pgxpool.Pool) storage.Repository { return squirrelrepo.New(pool) }},
 	}
 

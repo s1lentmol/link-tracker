@@ -1,5 +1,5 @@
 //nolint:govet // shadowing of short-lived err variables keeps multi-step SQL flows concise in this repository.
-package sql
+package rawsql
 
 import (
 	"context"
