@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/apperr"
+	appstorage "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/application/storage"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/github"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/stackoverflow"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage"
 )
 
 var stackOverflowQuestionPath = regexp.MustCompile(`^/questions/(\d+)(/.*)?$`)
@@ -22,55 +22,84 @@ type BotNotifier interface {
 }
 
 type Service struct {
-	repo     *storage.Repository
+	repo     appstorage.Repository
 	github   *github.Client
 	stack    *stackoverflow.Client
 	notifier BotNotifier
 	logger   *slog.Logger
 }
 
-func New(repo *storage.Repository, githubClient *github.Client, stackClient *stackoverflow.Client, notifier BotNotifier, logger *slog.Logger) *Service {
+func New(repo appstorage.Repository, githubClient *github.Client, stackClient *stackoverflow.Client, notifier BotNotifier, logger *slog.Logger) *Service {
 	return &Service{repo: repo, github: githubClient, stack: stackClient, notifier: notifier, logger: logger}
 }
 
 func (s *Service) CheckUpdates(ctx context.Context) {
-	resources := s.repo.Resources()
-	for _, res := range resources {
-		updatedAt, err := s.resolveUpdatedAt(ctx, res.URL)
+	const pageSize = 200
+	for offset := 0; ; offset += pageSize {
+		resources, err := s.repo.ListResourcesPage(ctx, pageSize, offset)
 		if err != nil {
-			s.logger.Warn("failed to fetch resource update timestamp",
-				slog.String("url", res.URL),
+			s.logger.Error("failed to fetch resources page",
+				slog.Int("limit", pageSize),
+				slog.Int("offset", offset),
 				slog.String("error", err.Error()),
 			)
-			continue
+			return
 		}
 
-		if !res.LastUpdate.IsZero() && !updatedAt.After(res.LastUpdate) {
-			continue
+		if len(resources) == 0 {
+			return
 		}
 
-		if res.LastUpdate.IsZero() {
-			s.repo.SetLastUpdate(res.URL, updatedAt)
-			continue
-		}
+		for _, res := range resources {
+			updatedAt, err := s.resolveUpdatedAt(ctx, res.URL)
+			if err != nil {
+				s.logger.Warn("failed to fetch resource update timestamp",
+					slog.String("url", res.URL),
+					slog.String("error", err.Error()),
+				)
+				continue
+			}
 
-		s.repo.SetLastUpdate(res.URL, updatedAt)
+			if !res.LastUpdate.IsZero() && !updatedAt.After(res.LastUpdate) {
+				continue
+			}
 
-		err = s.notifier.SendUpdate(res.ID, res.URL, "В ресурсе появились изменения", res.ChatIDs)
-		if err != nil {
-			s.logger.Error("failed to send update to bot",
+			if res.LastUpdate.IsZero() {
+				if err := s.repo.SetLastUpdateByLinkID(ctx, res.ID, updatedAt); err != nil {
+					s.logger.Error("failed to save initial last_update",
+						slog.Int64("link_id", res.ID),
+						slog.String("url", res.URL),
+						slog.String("error", err.Error()),
+					)
+				}
+				continue
+			}
+
+			if err := s.repo.SetLastUpdateByLinkID(ctx, res.ID, updatedAt); err != nil {
+				s.logger.Error("failed to update last_update",
+					slog.Int64("link_id", res.ID),
+					slog.String("url", res.URL),
+					slog.String("error", err.Error()),
+				)
+				continue
+			}
+
+			err = s.notifier.SendUpdate(res.ID, res.URL, "В ресурсе появились изменения", res.ChatIDs)
+			if err != nil {
+				s.logger.Error("failed to send update to bot",
+					slog.Int64("link_id", res.ID),
+					slog.String("url", res.URL),
+					slog.String("error", err.Error()),
+				)
+				continue
+			}
+
+			s.logger.Info("update sent",
 				slog.Int64("link_id", res.ID),
 				slog.String("url", res.URL),
-				slog.String("error", err.Error()),
+				slog.Int("chat_count", len(res.ChatIDs)),
 			)
-			continue
 		}
-
-		s.logger.Info("update sent",
-			slog.Int64("link_id", res.ID),
-			slog.String("url", res.URL),
-			slog.Int("chat_count", len(res.ChatIDs)),
-		)
 	}
 }
 

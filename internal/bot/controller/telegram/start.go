@@ -22,16 +22,6 @@ func newStartCommand(h *Handler) command {
 				username = update.Message.From.UserName
 			}
 
-			if h.userService != nil {
-				_, err := h.userService.RegisterUser(chatID, username)
-				if err != nil {
-					h.logger.Error("failed to register user locally",
-						slog.Int64("chat_id", chatID),
-						slog.String("error", err.Error()),
-					)
-				}
-			}
-
 			err := h.scrapper.RegisterChat(chatID)
 			if err != nil && grpcadapter.StatusCode(err) != codes.AlreadyExists {
 				h.logger.Error("failed to register chat in scrapper",

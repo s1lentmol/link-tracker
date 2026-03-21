@@ -14,10 +14,6 @@ type Bot interface {
 	SetCommands(commands map[string]string) error
 }
 
-type UserService interface {
-	RegisterUser(chatID int64, username string) (bool, error)
-}
-
 type ScrapperService interface {
 	RegisterChat(chatID int64) error
 	DeleteChat(chatID int64) error
@@ -47,22 +43,20 @@ func WithStateStore(store StateStore) Option {
 }
 
 type Handler struct {
-	bot         Bot
-	logger      *slog.Logger
-	commands    map[string]command
-	userService UserService
-	scrapper    ScrapperService
-	stateStore  StateStore
+	bot        Bot
+	logger     *slog.Logger
+	commands   map[string]command
+	scrapper   ScrapperService
+	stateStore StateStore
 }
 
-func New(bot Bot, userService UserService, logger *slog.Logger, opts ...Option) *Handler {
+func New(bot Bot, logger *slog.Logger, opts ...Option) *Handler {
 	h := &Handler{
-		bot:         bot,
-		logger:      logger,
-		commands:    make(map[string]command),
-		userService: userService,
-		scrapper:    noopScrapperService{},
-		stateStore:  NewMemoryStateStore(),
+		bot:        bot,
+		logger:     logger,
+		commands:   make(map[string]command),
+		scrapper:   noopScrapperService{},
+		stateStore: NewMemoryStateStore(),
 	}
 
 	for _, opt := range opts {

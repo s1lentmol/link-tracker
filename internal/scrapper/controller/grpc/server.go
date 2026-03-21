@@ -9,27 +9,27 @@ import (
 	"google.golang.org/grpc/status"
 
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/apperr"
+	appstorage "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/application/storage"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/application/tracker"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/shared/pb"
 )
 
 type Server struct {
 	pb.UnimplementedScrapperServiceServer
-	repo    *storage.Repository
+	repo    appstorage.Repository
 	tracker *tracker.Service
 }
 
-func NewServer(repo *storage.Repository, trackerSvc *tracker.Service) *Server {
+func NewServer(repo appstorage.Repository, trackerSvc *tracker.Service) *Server {
 	return &Server{repo: repo, tracker: trackerSvc}
 }
 
-func (s *Server) RegisterChat(_ context.Context, req *pb.RegisterChatRequest) (*pb.RegisterChatResponse, error) {
+func (s *Server) RegisterChat(ctx context.Context, req *pb.RegisterChatRequest) (*pb.RegisterChatResponse, error) {
 	if req.GetChatId() == 0 {
 		return nil, status.Error(codes.InvalidArgument, "chat_id is required")
 	}
 
-	err := s.repo.RegisterChat(req.GetChatId())
+	err := s.repo.RegisterChat(ctx, req.GetChatId())
 	if err != nil {
 		if errors.Is(err, apperr.ErrChatExists) {
 			return nil, status.Error(codes.AlreadyExists, "chat already exists")
@@ -40,12 +40,12 @@ func (s *Server) RegisterChat(_ context.Context, req *pb.RegisterChatRequest) (*
 	return &pb.RegisterChatResponse{}, nil
 }
 
-func (s *Server) DeleteChat(_ context.Context, req *pb.DeleteChatRequest) (*pb.DeleteChatResponse, error) {
+func (s *Server) DeleteChat(ctx context.Context, req *pb.DeleteChatRequest) (*pb.DeleteChatResponse, error) {
 	if req.GetChatId() == 0 {
 		return nil, status.Error(codes.InvalidArgument, "chat_id is required")
 	}
 
-	err := s.repo.DeleteChat(req.GetChatId())
+	err := s.repo.DeleteChat(ctx, req.GetChatId())
 	if err != nil {
 		if errors.Is(err, apperr.ErrChatNotFound) {
 			return nil, status.Error(codes.NotFound, "chat not found")
@@ -56,12 +56,12 @@ func (s *Server) DeleteChat(_ context.Context, req *pb.DeleteChatRequest) (*pb.D
 	return &pb.DeleteChatResponse{}, nil
 }
 
-func (s *Server) ListLinks(_ context.Context, req *pb.ListLinksRequest) (*pb.ListLinksResponse, error) {
+func (s *Server) ListLinks(ctx context.Context, req *pb.ListLinksRequest) (*pb.ListLinksResponse, error) {
 	if req.GetChatId() == 0 {
 		return nil, status.Error(codes.InvalidArgument, "chat_id is required")
 	}
 
-	subs, err := s.repo.ListLinks(req.GetChatId())
+	subs, err := s.repo.ListLinks(ctx, req.GetChatId())
 	if err != nil {
 		if errors.Is(err, apperr.ErrChatNotFound) {
 			return nil, status.Error(codes.NotFound, "chat not found")
@@ -82,7 +82,7 @@ func (s *Server) ListLinks(_ context.Context, req *pb.ListLinksRequest) (*pb.Lis
 	return &pb.ListLinksResponse{Links: links, Size: int32(len(links))}, nil
 }
 
-func (s *Server) AddLink(_ context.Context, req *pb.AddLinkRequest) (*pb.LinkResponse, error) {
+func (s *Server) AddLink(ctx context.Context, req *pb.AddLinkRequest) (*pb.LinkResponse, error) {
 	if req.GetChatId() == 0 || req.GetLink() == "" {
 		return nil, status.Error(codes.InvalidArgument, "chat_id and link are required")
 	}
@@ -93,7 +93,7 @@ func (s *Server) AddLink(_ context.Context, req *pb.AddLinkRequest) (*pb.LinkRes
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	sub, err := s.repo.AddLink(req.GetChatId(), req.GetLink(), req.GetTags(), req.GetFilters())
+	sub, err := s.repo.AddLink(ctx, req.GetChatId(), req.GetLink(), req.GetTags(), req.GetFilters())
 	if err != nil {
 		switch {
 		case errors.Is(err, apperr.ErrChatNotFound):
@@ -108,7 +108,7 @@ func (s *Server) AddLink(_ context.Context, req *pb.AddLinkRequest) (*pb.LinkRes
 	return &pb.LinkResponse{Id: sub.ID, Url: sub.URL, Tags: sub.Tags, Filters: sub.Filters}, nil
 }
 
-func (s *Server) RemoveLink(_ context.Context, req *pb.RemoveLinkRequest) (*pb.LinkResponse, error) {
+func (s *Server) RemoveLink(ctx context.Context, req *pb.RemoveLinkRequest) (*pb.LinkResponse, error) {
 	if req.GetChatId() == 0 || req.GetLink() == "" {
 		return nil, status.Error(codes.InvalidArgument, "chat_id and link are required")
 	}
@@ -116,7 +116,7 @@ func (s *Server) RemoveLink(_ context.Context, req *pb.RemoveLinkRequest) (*pb.L
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid link: %v", err))
 	}
 
-	sub, err := s.repo.RemoveLink(req.GetChatId(), req.GetLink())
+	sub, err := s.repo.RemoveLink(ctx, req.GetChatId(), req.GetLink())
 	if err != nil {
 		switch {
 		case errors.Is(err, apperr.ErrChatNotFound), errors.Is(err, apperr.ErrLinkNotFound):
