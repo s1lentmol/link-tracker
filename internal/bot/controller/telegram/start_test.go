@@ -6,9 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/application/user"
 	handler "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/controller/telegram"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/infrastructure/storage"
 )
 
 func TestStartCommand(t *testing.T) {
@@ -75,9 +73,7 @@ func TestStartCommand(t *testing.T) {
 			t.Parallel()
 
 			mock := &mockBotClient{}
-			repo := storage.NewUserRepository()
-			uc := user.NewUseCase(repo)
-			h := handler.New(mock, uc, newTestLogger())
+			h := handler.New(mock, newTestLogger())
 
 			update := makeCommandUpdate(tt.chatID, tt.username, "start")
 			for range tt.callCount {
@@ -91,15 +87,6 @@ func TestStartCommand(t *testing.T) {
 			}
 
 			assert.Equal(t, tt.chatID, mock.messages[0].ChatID)
-
-			exists, err := repo.Exists(tt.chatID)
-			require.NoError(t, err)
-			assert.True(t, exists)
-
-			user, err := repo.FindByChatID(tt.chatID)
-			require.NoError(t, err)
-			assert.Equal(t, tt.chatID, user.ChatID)
-			assert.Equal(t, tt.username, user.Username)
 		})
 	}
 }

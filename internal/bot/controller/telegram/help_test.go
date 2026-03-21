@@ -5,9 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/application/user"
 	handler "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/controller/telegram"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/infrastructure/storage"
 )
 
 func TestHelpCommand(t *testing.T) {
@@ -44,9 +42,7 @@ func TestHelpCommand(t *testing.T) {
 			t.Parallel()
 
 			mock := &mockBotClient{}
-			repo := storage.NewUserRepository()
-			uc := user.NewUseCase(repo)
-			h := handler.New(mock, uc, newTestLogger())
+			h := handler.New(mock, newTestLogger())
 
 			update := makeCommandUpdate(tt.chatID, tt.username, "help")
 			h.HandleUpdate(update)

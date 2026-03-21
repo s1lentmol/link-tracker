@@ -8,9 +8,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/application/user"
 	handler "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/controller/telegram"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/bot/infrastructure/storage"
 )
 
 type sentMessage struct {
@@ -113,9 +111,7 @@ func TestHandleUpdate(t *testing.T) {
 			t.Parallel()
 
 			mock := &mockBotClient{}
-			repo := storage.NewUserRepository()
-			uc := user.NewUseCase(repo)
-			h := handler.New(mock, uc, newTestLogger())
+			h := handler.New(mock, newTestLogger())
 
 			h.HandleUpdate(tt.update)
 
@@ -135,9 +131,7 @@ func TestNew_RegistersCommands(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockBotClient{}
-	repo := storage.NewUserRepository()
-	uc := user.NewUseCase(repo)
-	_ = handler.New(mock, uc, newTestLogger())
+	_ = handler.New(mock, newTestLogger())
 
 	assert.True(t, mock.setCmds, "New должен вызвать SetCommands для установки команд")
 }

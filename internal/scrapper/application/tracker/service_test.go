@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"sync"
 	"testing"
 	"time"
@@ -14,10 +15,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/apperr"
+	appstorage "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/application/storage"
 	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/application/tracker"
+	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/domain"
 	ghclient "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/github"
 	stackclient "gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/http/stackoverflow"
-	"gitlab.education.tbank.ru/backend-academy-go-2026/homeworks/link-tracker/internal/scrapper/infrastructure/storage"
 )
 
 type notifierCall struct {
@@ -55,10 +58,242 @@ func newTestLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+type memoryRepo struct {
+	mu            sync.RWMutex
+	nextID        int64
+	chats         map[int64]struct{}
+	subscriptions map[int64]map[string]domain.Subscription
+	resourcesByID map[int64]*domain.Resource
+	idByURL       map[string]int64
+}
+
+func newMemoryRepo() appstorage.Repository {
+	return &memoryRepo{
+		nextID:        1,
+		chats:         make(map[int64]struct{}),
+		subscriptions: make(map[int64]map[string]domain.Subscription),
+		resourcesByID: make(map[int64]*domain.Resource),
+		idByURL:       make(map[string]int64),
+	}
+}
+
+func (r *memoryRepo) RegisterChat(_ context.Context, chatID int64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.chats[chatID]; ok {
+		return apperr.ErrChatExists
+	}
+	r.chats[chatID] = struct{}{}
+	r.subscriptions[chatID] = make(map[string]domain.Subscription)
+	return nil
+}
+
+func (r *memoryRepo) DeleteChat(_ context.Context, chatID int64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.chats[chatID]; !ok {
+		return apperr.ErrChatNotFound
+	}
+	for url := range r.subscriptions[chatID] {
+		linkID := r.idByURL[url]
+		res := r.resourcesByID[linkID]
+		res.ChatIDs = removeChat(res.ChatIDs, chatID)
+		if len(res.ChatIDs) == 0 {
+			delete(r.resourcesByID, linkID)
+			delete(r.idByURL, url)
+		}
+	}
+	delete(r.subscriptions, chatID)
+	delete(r.chats, chatID)
+	return nil
+}
+
+func (r *memoryRepo) AddLink(_ context.Context, chatID int64, rawURL string, tags []string, filters []string) (*domain.Subscription, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.chats[chatID]; !ok {
+		return nil, apperr.ErrChatNotFound
+	}
+	if _, ok := r.subscriptions[chatID][rawURL]; ok {
+		return nil, apperr.ErrLinkExists
+	}
+
+	linkID, exists := r.idByURL[rawURL]
+	if !exists {
+		linkID = r.nextID
+		r.nextID++
+		r.idByURL[rawURL] = linkID
+		r.resourcesByID[linkID] = &domain.Resource{ID: linkID, URL: rawURL}
+	}
+
+	res := r.resourcesByID[linkID]
+	if !containsChat(res.ChatIDs, chatID) {
+		res.ChatIDs = append(res.ChatIDs, chatID)
+	}
+
+	sub := domain.Subscription{
+		ID:      linkID,
+		URL:     rawURL,
+		Tags:    append([]string(nil), tags...),
+		Filters: append([]string(nil), filters...),
+	}
+	r.subscriptions[chatID][rawURL] = sub
+	return &sub, nil
+}
+
+func (r *memoryRepo) RemoveLink(_ context.Context, chatID int64, rawURL string) (*domain.Subscription, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if _, ok := r.chats[chatID]; !ok {
+		return nil, apperr.ErrChatNotFound
+	}
+	sub, ok := r.subscriptions[chatID][rawURL]
+	if !ok {
+		return nil, apperr.ErrLinkNotFound
+	}
+	delete(r.subscriptions[chatID], rawURL)
+
+	linkID := r.idByURL[rawURL]
+	if res, ok := r.resourcesByID[linkID]; ok {
+		res.ChatIDs = removeChat(res.ChatIDs, chatID)
+		if len(res.ChatIDs) == 0 {
+			delete(r.resourcesByID, linkID)
+			delete(r.idByURL, rawURL)
+		}
+	}
+	return &sub, nil
+}
+
+func (r *memoryRepo) ListLinks(_ context.Context, chatID int64) ([]domain.Subscription, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if _, ok := r.chats[chatID]; !ok {
+		return nil, apperr.ErrChatNotFound
+	}
+	result := make([]domain.Subscription, 0, len(r.subscriptions[chatID]))
+	for _, sub := range r.subscriptions[chatID] {
+		result = append(result, sub)
+	}
+	return result, nil
+}
+
+func (r *memoryRepo) AddTag(_ context.Context, chatID int64, rawURL string, tag string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.chats[chatID]; !ok {
+		return apperr.ErrChatNotFound
+	}
+	sub, ok := r.subscriptions[chatID][rawURL]
+	if !ok {
+		return apperr.ErrLinkNotFound
+	}
+	for _, currentTag := range sub.Tags {
+		if currentTag == tag {
+			return apperr.ErrTagExists
+		}
+	}
+	sub.Tags = append(sub.Tags, tag)
+	r.subscriptions[chatID][rawURL] = sub
+	return nil
+}
+
+func (r *memoryRepo) RemoveTag(_ context.Context, chatID int64, rawURL string, tag string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.chats[chatID]; !ok {
+		return apperr.ErrChatNotFound
+	}
+	sub, ok := r.subscriptions[chatID][rawURL]
+	if !ok {
+		return apperr.ErrLinkNotFound
+	}
+	filtered := make([]string, 0, len(sub.Tags))
+	found := false
+	for _, currentTag := range sub.Tags {
+		if currentTag == tag {
+			found = true
+			continue
+		}
+		filtered = append(filtered, currentTag)
+	}
+	if !found {
+		return apperr.ErrTagNotFound
+	}
+	sub.Tags = filtered
+	r.subscriptions[chatID][rawURL] = sub
+	return nil
+}
+
+func (r *memoryRepo) ListTags(_ context.Context, chatID int64, rawURL string) ([]string, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if _, ok := r.chats[chatID]; !ok {
+		return nil, apperr.ErrChatNotFound
+	}
+	sub, ok := r.subscriptions[chatID][rawURL]
+	if !ok {
+		return nil, apperr.ErrLinkNotFound
+	}
+	return append([]string(nil), sub.Tags...), nil
+}
+
+func (r *memoryRepo) ListResourcesPage(_ context.Context, limit int, offset int) ([]domain.Resource, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if limit <= 0 {
+		return []domain.Resource{}, nil
+	}
+	resources := make([]domain.Resource, 0, len(r.resourcesByID))
+	for _, res := range r.resourcesByID {
+		resources = append(resources, *res)
+	}
+	sort.Slice(resources, func(i, j int) bool { return resources[i].ID < resources[j].ID })
+	if offset >= len(resources) {
+		return []domain.Resource{}, nil
+	}
+	end := offset + limit
+	if end > len(resources) {
+		end = len(resources)
+	}
+	return append([]domain.Resource(nil), resources[offset:end]...), nil
+}
+
+func (r *memoryRepo) SetLastUpdateByLinkID(_ context.Context, linkID int64, ts time.Time) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	res, ok := r.resourcesByID[linkID]
+	if !ok {
+		return apperr.ErrLinkNotFound
+	}
+	res.LastUpdate = ts
+	return nil
+}
+
+func containsChat(ids []int64, chatID int64) bool {
+	for _, id := range ids {
+		if id == chatID {
+			return true
+		}
+	}
+	return false
+}
+
+func removeChat(ids []int64, chatID int64) []int64 {
+	result := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id != chatID {
+			result = append(result, id)
+		}
+	}
+	return result
+}
+
 func TestService_ValidateURL(t *testing.T) {
 	t.Parallel()
 
-	svc := tracker.New(storage.NewRepository(), nil, nil, &notifierMock{}, newTestLogger())
+	svc := tracker.New(newMemoryRepo(), nil, nil, &notifierMock{}, newTestLogger())
 
 	tests := []struct {
 		name    string
@@ -106,9 +341,9 @@ func TestService_CheckUpdates_GitHub(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	repo := storage.NewRepository()
-	require.NoError(t, repo.RegisterChat(1))
-	_, err := repo.AddLink(1, "https://github.com/owner/repo", []string{"work"}, nil)
+	repo := newMemoryRepo()
+	require.NoError(t, repo.RegisterChat(context.Background(), 1))
+	_, err := repo.AddLink(context.Background(), 1, "https://github.com/owner/repo", []string{"work"}, nil)
 	require.NoError(t, err)
 
 	notify := &notifierMock{}
