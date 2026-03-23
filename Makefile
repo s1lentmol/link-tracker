@@ -1,9 +1,7 @@
 COVERAGE_FILE ?= coverage.out
 
-# Get all directories in cmd/ as available modules and add moved services
-MODULES := $(sort $(notdir $(wildcard cmd/*)) bot)
+MODULES := bot scrapper
 
-# Help target - display usage information
 .PHONY: help
 help:
 	@echo "Available commands:"
@@ -15,21 +13,19 @@ help:
 build:
 	@echo "Building all modules: $(MODULES)"
 	@mkdir -p bin
-	@$(foreach mod,$(MODULES),echo "Building module: $(mod)"; if [ "$(mod)" = "bot" ]; then go build -o ./bin/$(mod) ./services/bot/cmd/$(mod); else go build -o ./bin/$(mod) ./cmd/$(mod); fi;)
+	@go build -o ./bin/bot ./cmd/bot
+	@go build -o ./bin/scrapper ./cmd/scrapper
 
-# Convenience targets for building individual modules
-.PHONY: $(addprefix build_,$(MODULES))
-$(addprefix build_,$(MODULES)):
-	@modulename=$(subst build_,,$@); \
-	echo "Building module: $$modulename"; \
-	mkdir -p bin; \
-	if [ "$$modulename" = "bot" ]; then \
-		go build -o ./bin/$$modulename ./services/bot/cmd/$$modulename; \
-	else \
-		go build -o ./bin/$$modulename ./cmd/$$modulename; \
-	fi
+.PHONY: build_bot
+build_bot:
+	@mkdir -p bin
+	@go build -o ./bin/bot ./cmd/bot
 
-## test: run all tests
+.PHONY: build_scrapper
+build_scrapper:
+	@mkdir -p bin
+	@go build -o ./bin/scrapper ./cmd/scrapper
+
 .PHONY: test
 test:
 	@go test --race -count=1 -coverprofile='$(COVERAGE_FILE)' ./...
